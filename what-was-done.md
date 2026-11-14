@@ -315,3 +315,160 @@ Started HotelServiceApplication in 3.806 seconds
 
 ### Следующий этап
 **Этап 5: Hotel Service — сервисы и контроллеры (CRUD)**
+
+---
+
+## Этап 5: Hotel Service — сервисы и контроллеры (CRUD)
+
+### Дата выполнения
+15 ноября 2026
+
+### Что сделано
+
+#### 1. Созданы исключения
+
+**RoomNotAvailableException** — исключение для кода 409 Conflict при невозможности подтверждения доступности номера.
+```
+RoomNotAvailableException(Long roomId, String message)
+RoomNotAvailableException(Long roomId, Throwable cause)
+```
+
+**ResourceNotFoundException** — исключение для кода 404 Not Found при отсутствии ресурса.
+```
+ResourceNotFoundException(String resourceName, Long id)
+```
+
+**GlobalExceptionHandler** — глобальный обработчик исключений (`@RestControllerAdvice`):
+- `ResourceNotFoundException` → HTTP 404 Not Found
+- `RoomNotAvailableException` → HTTP 409 Conflict
+- `AccessDeniedException` → HTTP 403 Forbidden
+- `MethodArgumentNotValidException` → HTTP 400 Bad Request с детализацией ошибок по полям
+- `Exception` (generic) → HTTP 500 Internal Server Error
+
+Все ошибки возвращаются в формате JSON с полями: `timestamp`, `status`, `error`, `message`, `fieldErrors`.
+
+#### 2. Созданы сервисы
+
+**HotelService** — бизнес-логика CRUD для отелей:
+- `createHotel(HotelCreateRequest)` — создание отеля со статусом 201 Created
+- `getAllHotels()` — получение всех отелей с агрегацией totalRooms и availableRooms
+- `getHotelById(Long)` — получение отеля по ID
+- `updateHotel(Long, HotelCreateRequest)` — обновление названия и адреса
+- `deleteHotel(Long)` — каскадное удаление отеля со всеми номерами
+
+**RoomService** — бизнес-логика для номеров + доступность:
+- `createRoom(RoomCreateRequest)` — создание номера в отеле (сохранение напрямую через RoomRepository для корректного получения ID)
+- `getAllAvailableRooms()` — получение всех доступных номеров (available = true)
+- `getRecommendedRooms()` — получение номеров для автоподбора (сортировка: timesBooked ASC, id ASC)
+- `getRoomById(Long)` — получение номера по ID
+- `confirmAvailability(Long roomId, LocalDateTime start, LocalDateTime end, String correlationId)` — подтверждение доступности:
+  - Проверяет существование номера
+  - Проверяет пересечение дат с существующими бронированиями (PENDING/CONFIRMED)
+  - При пересечении выбрасывает `RoomNotAvailableException` (409)
+  - При отсутствии пересечений создаёт временную блокировку (локальное бронирование с userId=0)
+- `releaseSlot(Long roomId, LocalDateTime start, LocalDateTime end, String correlationId)` — компенсация:
+  - Удаляет временное бронирование (userId=0) для заданного периода через `@Modifying` запрос
+
+#### 3. Созданы контроллеры
+
+**HotelController** (`@RequestMapping("/api/hotels")`):
+| Метод | Путь | Описание |
+|-------|------|----------|
+| `POST` | `/api/hotels` | Создать отель (201) |
+| `GET` | `/api/hotels` | Получить список отелей |
+| `GET` | `/api/hotels/{id}` | Получить отель по ID |
+| `PATCH` | `/api/hotels/{id}` | Обновить отель |
+| `DELETE` | `/api/hotels/{id}` | Удалить отель (204) |
+
+**RoomController** (`@RequestMapping("/api/rooms")`):
+| Метод | Путь | Описание |
+|-------|------|----------|
+| `POST` | `/api/rooms` | Создать номер (201) |
+| `GET` | `/api/rooms` | Получить доступные номера |
+| `GET` | `/api/rooms/recommend` | Получить рекомендованные номера (timesBooked ASC) |
+| `POST` | `/api/rooms/{roomId}/confirm-availability` | Подтвердить доступность (200) |
+| `POST` | `/api/rooms/{roomId}/release` | Снять временную блокировку (200) |
+
+Все эндпоинты аннотированы SpringDoc OpenAPI: `@Operation`, `@ApiResponse`, `@Tag`.
+
+#### 4. Создан репозиторий BookingRepository
+
+**BookingRepository** — операции с локальными бронированиями в Hotel Service:
+- `findOverlappingBookings(roomId, start, end)` — поиск пересекающихся бронирований
+- `findTemporaryBookings(roomId, start, end)` — поиск временных бронирований (userId=0)
+- `deleteTemporaryBookings(roomId, start, end)` — удаление временных бронирований (`@Modifying`)
+
+#### 5. Добавлены `-parameters` в компилятор
+
+В родительский `pom.xml` добавлен компиляторный флаг `<arg>-parameters</arg>`, чтобы Spring MVC мог корректно обрабатывать `@PathVariable` и `@RequestParam` параметры.
+
+#### 6. Временная конфигурация безопасности
+
+Создан `SecurityConfig` для тестирования Этапа 5:
+- `@EnableWebSecurity` (без `@EnableMethodSecurity`, чтобы `@PreAuthorize` не блокировал запросы)
+- `anyRequest().permitAll()` — все эндпоинты доступны без аутентификации
+
+> **Примечание**: Полная JWT-безопасность будет реализована в Этапе 6.
+
+### Проверки
+
+Все 12 тестов прошли успешно:
+
+| Тест | Метод | Путь | Результат |
+|------|-------|------|-----------|
+| 1 | POST | /api/hotels | ✅ HTTP 201, id=1 |
+| 2 | POST | /api/rooms | ✅ HTTP 201, id=1, hotelId=1, hotelName="Grand Hotel" |
+| 3 | POST | /api/rooms (room 201) | ✅ HTTP 201, id=2 |
+| 4 | GET | /api/hotels | ✅ Список из 1 отеля, totalRooms=2, availableRooms=2 |
+| 5 | GET | /api/hotels/1 | ✅ HTTP 200, отель с деталями |
+| 6 | GET | /api/rooms | ✅ Список из 2 номеров |
+| 7 | GET | /api/rooms/recommend | ✅ Сортировка timesBooked ASC, id ASC |
+| 8 | POST | /api/rooms/1/confirm-availability | ✅ HTTP 200, слот заблокирован |
+| 9 | POST | /api/rooms/1/confirm-availability (дубликат) | ✅ HTTP 409 Conflict |
+| 10 | POST | /api/rooms/1/release | ✅ HTTP 200, блокировка снята |
+| 11 | PATCH | /api/hotels/1 | ✅ HTTP 200, отель обновлён |
+| 12 | DELETE | /api/hotels/1 | ✅ HTTP 204 |
+| — | DELETE | /api/hotels/999 | ✅ HTTP 404 Not Found |
+| — | POST | /api/hotels (пустое тело) | ✅ HTTP 400, валидация name + address |
+| — | POST | /api/rooms (hotelId=999) | ✅ HTTP 404, отель не найден |
+
+**Дополнительные сценарии:**
+- ✅ Подтверждение доступности после release — успешно (HTTP 200)
+- ✅ Release несуществующего слота — успешно (HTTP 200, пустой результат)
+- ✅ Подтверждение для непересекающегося периода — успешно (HTTP 200)
+
+### Логи компиляции
+
+```
+mvn clean compile — BUILD SUCCESS
+Compiling 22 source files
+Started HotelServiceApplication in 2.601 seconds
+```
+
+### Замечания
+
+- JDK в системе: **OpenJDK 25.0.1** — совместимость подтверждена
+- Eureka Server не запущен — ошибки `Connect to http://localhost:8761 failed: Connection refused` ожидаемы
+- H2 in-memory — данные сбрасываются при перезапуске (норма для разработки)
+- MapStruct `toResponse(Room)` корректно маппит `hotel.id` → `hotelId` и `hotel.name` → `hotelName`
+- Валидация через `@NotBlank`/`@NotNull` работает, ошибки возвращаются с русскими сообщениями
+- `@Modifying` запрос в `BookingRepository` требует `@Transactional` на вызывающем методе
+- Фикс: `@PathVariable` имя должно совпадать с параметром метода (`{roomId}` → `roomId`)
+
+### Файлы созданные/изменённые на этом этапе
+
+| Файл | Действие |
+|------|----------|
+| `hotel-service/.../exception/RoomNotAvailableException.java` | Создан |
+| `hotel-service/.../exception/ResourceNotFoundException.java` | Создан |
+| `hotel-service/.../exception/GlobalExceptionHandler.java` | Создан |
+| `hotel-service/.../service/HotelService.java` | Создан |
+| `hotel-service/.../service/RoomService.java` | Создан |
+| `hotel-service/.../controller/HotelController.java` | Создан |
+| `hotel-service/.../controller/RoomController.java` | Создан |
+| `hotel-service/.../repository/BookingRepository.java` | Создан |
+| `hotel-service/.../config/SecurityConfig.java` | Создан (временный, для тестов Этапа 5) |
+| `pom.xml` | Изменён (добавлен `<arg>-parameters</arg>`) |
+
+### Следующий этап
+**Этап 6: Hotel Service — безопасность и Swagger**

@@ -126,5 +126,51 @@
 | `hotel-service/.../HotelServiceApplication.java` | Создан |
 | `booking-service/.../BookingServiceApplication.java` | Создан |
 
+---
+
+## Этап 3: Eureka Server
+
+### Дата выполнения
+14 ноября 2026
+
+### Что сделано
+
+По плану Этапа 3:
+- **EurekaServerApplication.java** — `@SpringBootApplication` + `@EnableEurekaServer` (уже было из Этапа 2)
+- **application.yml** — порт `8761`, `register-with-eureka: false`, `fetch-registry: false`, `enable-self-preservation: false` (уже было из Этапа 2)
+- **application-test.yml** (опционально по плану) — создан для тестов на изолированном порту `8762`
+
+### Проверки
+
+| Проверка | Результат |
+|----------|-----------|
+| `mvn clean compile` — модуль eureka-server | ✅ BUILD SUCCESS |
+| `mvn spring-boot:run` — запуск сервера | ✅ Успешный запуск за 2.034 сек |
+| `curl http://localhost:8761/` | ✅ HTTP 200, HTML ответ |
+| `curl http://localhost:8761/eureka/apps` | ✅ HTTP 200, XML ответ: `<applications>` |
+| `curl http://localhost:8761/eureka/apps.json` | ⚠️ HTTP 404 — не критично (REST API Eureka использует другой путь) |
+
+### Логи запуска (ключевые строки)
+```
+Starting EurekaServerApplication using Java 25.0.1
+Tomcat started on port 8761 (http) with context path '/'
+Started EurekaServerApplication in 2.034 seconds
+Started Eureka Server
+```
+
+### Предупреждения в логах (не критичные)
+- `Failed to set up a Bean Validation provider` — не требуется для Eureka Server
+- `Spring Cloud LoadBalancer is currently working with the default cache` — рекомендация по Caffeine в production
+
+### Замечания
+- JDK в системе: **OpenJDK 25.0.1** — совместимость подтверждена
+- Eureka Server работает корректно, готов к регистрации микросервисов
+
+### Файлы созданные/изменённые на этом этапе
+
+| Файл | Действие |
+|------|----------|
+| `eureka-server/src/test/resources/application-test.yml` | Создан (порт 8762 для тестов) |
+
 ### Следующий этап
-**Этап 3: Hotel Service — сущности и репозитории**
+**Этап 4: Hotel Service — сущности и репозитории**

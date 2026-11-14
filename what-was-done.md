@@ -172,5 +172,146 @@ Started Eureka Server
 |------|----------|
 | `eureka-server/src/test/resources/application-test.yml` | Создан (порт 8762 для тестов) |
 
+---
+
+## Этап 4: Hotel Service — сущности и репозитории
+
+### Дата выполнения
+14 ноября 2026
+
+### Что сделано
+
+#### 1. Обновлён `hotel-service/pom.xml`
+
+Добавлена зависимость `spring-boot-starter-validation` для валидации входных данных (DTO).
+
+**Добавленная зависимость:**
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-validation</artifactId>
+</dependency>
+```
+
+#### 2. Созданы сущности JPA
+
+**BaseEntity** — базовый класс с общими полями для всех сущностей:
+- `createdAt` (LocalDateTime) — время создания записи
+- `updatedAt` (LocalDateTime) — время последнего обновления
+- Методы `@PrePersist` (onCreate) и `@PreUpdate` (onUpdate) для автозаполнения
+
+**Hotel** — сущность «Отель»:
+- `id` (Long, auto-generated)
+- `name` (String, nullable=false, length=255)
+- `address` (String, nullable=false, length=500)
+- `rooms` (List<Room>, OneToMany, cascade=ALL, orphanRemoval)
+- Методы `addRoom()` и `removeRoom()` для управления связью
+
+**Room** — сущность «Номер»:
+- `id` (Long, auto-generated)
+- `hotel` (Hotel, ManyToOne, LAZY)
+- `number` (String, nullable=false, length=50) — обозначение комнаты
+- `available` (Boolean, default=true) — операционная доступность
+- `timesBooked` (Integer, default=0) — счётчик бронирований для алгоритма равномерной загрузки
+
+**Booking** (локальная сущность Hotel Service) — сущность для проверки доступности:
+- `id` (Long, auto-generated)
+- `userId` (Long) — идентификатор пользователя (не foreign key, данные в Booking Service)
+- `roomId` (Long) — идентификатор номера
+- `startDate` (LocalDateTime) — дата начала бронирования
+- `endDate` (LocalDateTime) — дата окончания бронирования
+- `status` (BookingStatus enum: PENDING, CONFIRMED, CANCELLED)
+- Используется исключительно в Hotel Service для проверки пересечений дат
+
+#### 3. Созданы репозитории
+
+**HotelRepository** — JpaRepository<Hotel, Long>:
+- `findByName(String name)` — поиск по точному названию
+- `findByNameContainingIgnoreCase(String name)` — поиск по подстроке
+- `findAllWithRooms()` — JOIN FETCH для предотвращения N+1
+- `findByIdWithRooms(Long id)` — поиск по ID с номерами
+
+**RoomRepository** — JpaRepository<Room, Long>:
+- `findByAvailableTrue()` — все доступные номера
+- `findByAvailableTrueOrderByTimesBookedAscIdAsc()` — доступные, сортировка по timesBooked ASC, id ASC (алгоритм автоподбора)
+- `findByHotelIdAndAvailableTrue(Long hotelId)` — доступные номера конкретного отеля
+- `findOverlappingBookings(roomId, start, end)` — проверка пересечений бронирований (PENDING/CONFIRMED)
+- `findByIdWithHotel(Long id)` — поиск с загруженным отелем
+
+#### 4. Созданы DTO
+
+**HotelCreateRequest** (запрос создания отеля):
+- `name` (NotBlank, max 255)
+- `address` (NotBlank, max 500)
+
+**HotelResponse** (ответ с информацией об отеле):
+- `id`, `name`, `address`, `totalRooms`, `availableRooms`
+- `createdAt`, `updatedAt`
+
+**RoomCreateRequest** (запрос создания номера):
+- `hotelId` (NotNull, Min 1)
+- `number` (NotBlank, max 50)
+- `available` (Boolean, default=true)
+
+**RoomResponse** (ответ с информацией о номере):
+- `id`, `hotelId`, `hotelName`, `number`, `available`, `timesBooked`
+- `createdAt`, `updatedAt`
+
+#### 5. Созданы MapStruct-мапперы
+
+**HotelMapper** (`@Mapper(componentModel = "spring")`):
+- `toEntity(HotelCreateRequest)` — создание сущности из запроса
+- `toResponse(Hotel)` — преобразование в DTO с вычислением totalRooms и availableRooms
+- `toResponseList(List<Hotel>)` — преобразование списка
+
+**RoomMapper** (`@Mapper(componentModel = "spring")`):
+- `toEntity(RoomCreateRequest)` — создание сущности из запроса
+- `toResponse(Room)` — преобразование в DTO с извлечением hotel.id и hotel.name
+- `toResponseList(List<Room>)` — преобразование списка
+
+### Проверки
+
+| Проверка | Результат |
+|----------|-----------|
+| `mvn clean compile` — модуль hotel-service | ✅ BUILD SUCCESS |
+| `mvn spring-boot:run` — запуск сервиса | ✅ Успешный запуск за 3.806 сек |
+| `curl http://localhost:8081/api/hotels` (без токена) | ✅ HTTP 401 (ожидается, безопасность в Этапе 6) |
+| Логи H2 инициализации | ✅ Таблицы hotels, rooms, bookings, base_entity созданы |
+
+### Логи запуска (ключевые строки)
+```
+Starting HotelServiceApplication using Java 25.0.1
+...
+Tomcat started on port 8081 (http) with context path '/'
+Started HotelServiceApplication in 3.806 seconds
+```
+
+### Предупреждения в логах (не критичные)
+- `Cannot execute request on any known server` — ожидаемо, Eureka Server не запущен во время тестирования. В финальной проверке (Этап 17) все сервисы будут запущены одновременно.
+
+### Замечания
+- JDK в системе: **OpenJDK 25.0.1** — совместимость подтверждена
+- Сущность `Booking` создана локально в Hotel Service только для проверки пересечений дат. Полная сущность Booking находится в Booking Service
+- Lombok-генераторы работают корректно, MapStruct генерирует реализацию без ошибок
+- Для MapStruct-мапперов использован `unmappedTargetPolicy = IGNORE`, чтобы игнорировать поля, не отображаемые через Lombok-билдер
+
+### Файлы созданные/изменённые на этом этапе
+
+| Файл | Действие |
+|------|----------|
+| `hotel-service/pom.xml` | Изменён (добавлена validation-зависимость) |
+| `hotel-service/.../entity/BaseEntity.java` | Создан |
+| `hotel-service/.../entity/Hotel.java` | Создан |
+| `hotel-service/.../entity/Room.java` | Создан |
+| `hotel-service/.../entity/Booking.java` | Создан |
+| `hotel-service/.../repository/HotelRepository.java` | Создан |
+| `hotel-service/.../repository/RoomRepository.java` | Создан |
+| `hotel-service/.../dto/HotelCreateRequest.java` | Создан |
+| `hotel-service/.../dto/HotelResponse.java` | Создан |
+| `hotel-service/.../dto/RoomCreateRequest.java` | Создан |
+| `hotel-service/.../dto/RoomResponse.java` | Создан |
+| `hotel-service/.../mapper/HotelMapper.java` | Создан |
+| `hotel-service/.../mapper/RoomMapper.java` | Создан |
+
 ### Следующий этап
-**Этап 4: Hotel Service — сущности и репозитории**
+**Этап 5: Hotel Service — сервисы и контроллеры (CRUD)**

@@ -3,6 +3,9 @@ package com.skillfactory.luzhin.hotelservice.exception;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -15,6 +18,13 @@ import java.util.Map;
 /**
  * Глобальный обработчик исключений для всех REST-контроллеров Hotel Service.
  * Преобразует исключения в структурированные ответы HTTP с кодами состояния и сообщениями об ошибках.
+ *
+ * <p>Особенности:
+ * <ul>
+ *   <li>AccessDeniedException без аутентификации → 401 (пользователь не авторизован)</li>
+ *   <li>AccessDeniedException с анонимной аутентификацией → 401 (токен отсутствует или невалиден)</li>
+ *   <li>AccessDeniedException с реальной аутентификацией → 403 (пользователь без нужной роли)</li>
+ * </ul>
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -54,16 +64,36 @@ public class GlobalExceptionHandler {
     /**
      * Обрабатывает исключение доступа (пользователь не имеет необходимой роли).
      *
+     * <p>Определяет код ответа на основе статуса аутентификации:
+     * <ul>
+     *   <li>Если аутентификация отсутствует или является анонимной — возвращается 401 Unauthorized,
+     *       так как пользователь не прошёл аутентификацию (отсутствует или невалиден JWT-токен)</li>
+     *   <li>Если аутентификация реальная, но роль недостаточна — возвращается 403 Forbidden</li>
+     * </ul>
+     *
      * @param ex исключение
-     * @return HTTP 403 Forbidden с описанием ошибки
+     * @return HTTP 401 Unauthorized или 403 Forbidden с описанием ошибки
      */
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<Map<String, Object>> handleAccessDeniedException(AccessDeniedException ex) {
         Map<String, Object> body = new HashMap<>();
         body.put("timestamp", LocalDateTime.now());
+        body.put("error", "Unauthorized");
+        body.put("message", "Authentication required");
+
+        // Проверяем статус аутентификации в текущем контексте безопасности
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        // Если аутентификация отсутствует или это анонимный пользователь — возвращаем 401
+        if (authentication == null || authentication instanceof AnonymousAuthenticationToken) {
+            body.put("status", HttpStatus.UNAUTHORIZED.value());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(body);
+        }
+
+        // Аутентифицированный пользователь без нужной роли — возвращаем 403
         body.put("status", HttpStatus.FORBIDDEN.value());
         body.put("error", "Forbidden");
-        body.put("message", "Access denied. Required role is insufficient.");
+        body.put("message", "Access denied. Insufficient role.");
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
     }
 

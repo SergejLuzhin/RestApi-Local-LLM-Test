@@ -3,6 +3,7 @@ package com.skillfactory.luzhin.hotelservice.controller;
 import com.skillfactory.luzhin.hotelservice.dto.RoomCreateRequest;
 import com.skillfactory.luzhin.hotelservice.dto.RoomResponse;
 import com.skillfactory.luzhin.hotelservice.service.RoomService;
+import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -95,6 +96,7 @@ public class RoomController {
      * @param correlationId сквозной идентификатор корреляции
      */
     @PostMapping("/{roomId}/confirm-availability")
+    @Hidden
     @Operation(
             summary = "Подтвердить доступность номера",
             description = "Внутренний эндпоинт для подтверждения доступности номера на заданный период. "
@@ -121,6 +123,7 @@ public class RoomController {
      * @param correlationId сквозной идентификатор корреляции
      */
     @PostMapping("/{roomId}/release")
+    @Hidden
     @Operation(
             summary = "Снять временную блокировку",
             description = "Внутренний эндпоинт для компенсации: снимает временную блокировку слота. "

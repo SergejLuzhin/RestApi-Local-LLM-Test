@@ -470,5 +470,155 @@ Started HotelServiceApplication in 2.601 seconds
 | `hotel-service/.../config/SecurityConfig.java` | Создан (временный, для тестов Этапа 5) |
 | `pom.xml` | Изменён (добавлен `<arg>-parameters</arg>`) |
 
+---
+
+## Этап 6: Hotel Service — JWT-безопасность и Swagger/OpenAPI-документация
+
+### Дата выполнения
+15 ноября 2026
+
+### Что сделано
+
+#### 1. Создан `JwtUtil` — утилита для работы с JWT-токенами
+
+**Файл:** `hotel-service/.../config/JwtUtil.java`
+
+Утилита для парсинга, валидации и извлечения данных из JWT-токенов. Использует алгоритм **HS256** (HMAC with SHA-256) для подписи и верификации.
+
+**Основные методы:**
+- `getUsername(String token)` — извлечение имени пользователя из claims (`sub`)
+- `getRole(String token)` — извлечение роли из claims (`role`), формат `ROLE_USER` или `ROLE_ADMIN`
+- `getExpirationDate(String token)` — извлечение даты истечения
+- `isTokenExpired(String token)` — проверка, истёк ли токен
+- `isTokenValid(String token)` — полная валидация (подпись, срок, наличие пользователя)
+
+**Конфигурация:**
+- Секрет JWT загружается из `jwt.secret` (переменная окружения `JWT_SECRET`, default: `mySecretKey123...`)
+- TTL токена — из `jwt.expiration-ms` (по умолчанию 3600000 мс = 1 час)
+- Используется библиотека **jjwt 0.12.6**: `Jwts.parser().verifyWith(signingKey).build().parseSignedClaims(token)`
+
+#### 2. Создан `JwtAuthenticationFilter` — фильтр аутентификации JWT
+
+**Файл:** `hotel-service/.../config/JwtAuthenticationFilter.java`
+
+Наследуется от `OncePerRequestFilter` — гарантируется однократное выполнение на каждый HTTP-запрос.
+
+**Логика работы:**
+1. Извлекает заголовок `Authorization`
+2. Проверяет наличие префикса `Bearer `
+3. Если заголовок отсутствует — запрос продолжает обработку (для публичных эндпоинтов)
+4. Валидирует токен через `JwtUtil.isTokenValid()`
+5. При невалидном токене — возвращает HTTP 401
+6. При валидном токене — извлекает `username` и `role`, создаёт `UsernamePasswordAuthenticationToken` с `SimpleGrantedAuthority(role)` и устанавливает в `SecurityContextHolder`
+7. **Пропускает без аутентификации**: `/swagger-ui/**`, `/v3/api-docs/**`, `/swagger-resources/**`, `/swagger-ui.html`, `/actuator/health`, `/h2-console`
+
+#### 3. Обновлён `SecurityConfig` — JWT-безопасность + `@EnableMethodSecurity`
+
+**Файл:** `hotel-service/.../config/SecurityConfig.java`
+
+**Полная переработка конфигурации безопасности:**
+
+- `@EnableWebSecurity` + `@EnableMethodSecurity` — включение метод-безопасности
+- `SessionCreationPolicy.STATELESS` — сервер не хранит HTTP-сессию
+- `AuthenticationEntryPoint` — кастомная обработка ошибок аутентификации, возврат HTTP 401 JSON вместо 500
+- `AccessDeniedHandler` — возврат HTTP 401 при AccessDeniedException от `@PreAuthorize` (когда пользователь не аутентифицирован)
+- `JwtAuthenticationFilter` вставляется перед `UsernamePasswordAuthenticationFilter`
+
+**Правила авторизации (порядок имеет значение):**
+| Паттерн | Метод | Доступ |
+|---------|-------|--------|
+| `/swagger-ui/**`, `/v3/api-docs/**`, `/swagger-resources/**`, `/swagger-ui.html`, `/actuator/**`, `/h2-console/**` | Любой | permitAll (публично) |
+| `/api/hotels` | GET | permitAll (публичный поиск) |
+| `/api/hotels/**` | GET | permitAll (публичный поиск) |
+| `/api/rooms` | GET | permitAll (публичный поиск) |
+| `/api/rooms/recommend` | GET | permitAll (публичный автоподбор) |
+| `/api/rooms/{roomId}/confirm-availability` | POST | permitAll (внутренний вызов Booking Service) |
+| `/api/rooms/{roomId}/release` | POST | permitAll (внутренний вызов Booking Service) |
+| `/api/**` | Любой другой | authenticated |
+| `anyRequest()` | Любой | authenticated |
+
+**Важные решения:**
+- `@PreAuthorize("hasRole('ADMIN')")` на POST/PATCH/DELETE контроллерах — разграничение ролей (ADMIN создаёт/обновляет/удаляет)
+- Внутренние эндпоинты (`confirm-availability`, `release`) помечены `@Hidden` в Swagger
+- Все `/**` паттерны в `requestMatchers` работают с Spring Security 6.x PathPatternParser — `**` разрешён только в конце пути
+
+#### 4. Скрыты внутренние эндпоинты из Swagger/OpenAPI
+
+**Файл:** `hotel-service/.../controller/RoomController.java`
+
+К методам `confirmAvailability()` и `releaseSlot()` добавлена аннотация `@Hidden` из SpringDoc OpenAPI — эти эндпоинты недоступны в Swagger UI, так как они предназначены только для внутренних вызовов между микросервисами.
+
+#### 5. Исправлен GlobalExceptionHandler — корректный возврат 401 вместо 403
+
+**Файл:** `hotel-service/.../exception/GlobalExceptionHandler.java`
+
+**Проблема:** `@PreAuthorize("hasRole('ADMIN')")` при отсутствии токена генерировал `AccessDeniedException`, который обрабатывался как HTTP 403 Forbidden.
+
+**Решение:** Добавлена проверка статуса аутентификации в обработчике `AccessDeniedException`:
+```java
+Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+if (authentication == null || authentication instanceof AnonymousAuthenticationToken) {
+    return HTTP 401 (пользователь не авторизован)
+}
+return HTTP 403 (аутентифицированный пользователь без нужной роли)
+```
+
+- Без токена → `AnonymousAuthenticationToken` → **401 Unauthorized**
+- С токеном, но без нужной роли → реальная аутентификация → **403 Forbidden**
+
+#### 6. Обновлён SecurityConfig — `@Bean AuthenticationEntryPoint`
+
+**Файл:** `hotel-service/.../config/SecurityConfig.java`
+
+`AuthenticationEntryPoint` вынесен в отдельный `@Bean` метод и инжектируется в `securityFilterChain` через аргумент метода. Это обеспечивает корректную работу Spring Security и позволяет переиспользовать конфигурацию.
+
+### Проверки безопасности
+
+Все 11 тестов прошли успешно:
+
+| # | Тест | Метод | Путь | Ожидалось | Получено | Статус |
+|---|------|-------|------|-----------|----------|--------|
+| 1 | GET /api/hotels без токена | GET | /api/hotels | 200 | 200 | ✅ |
+| 2 | GET /api/hotels/1 без токена | GET | /api/hotels/1 | 200/404 | 404 | ✅ |
+| 3 | POST /api/hotels без токена | POST | /api/hotels | **401** | **401** | ✅ |
+| 4 | POST /api/rooms без токена | POST | /api/rooms | **401** | **401** | ✅ |
+| 5 | PATCH /api/hotels/1 без токена | PATCH | /api/hotels/1 | **401** | **401** | ✅ |
+| 6 | DELETE /api/hotels/1 без токена | DELETE | /api/hotels/1 | **401** | **401** | ✅ |
+| 7 | POST confirm-avail без токена (внутренний) | POST | /api/rooms/1/confirm-availability | 200/404 | 404 | ✅ |
+| 8 | GET /api/rooms/recommend без токена | GET | /api/rooms/recommend | 200 | 200 | ✅ |
+| 9 | POST release без токена (внутренний) | POST | /api/rooms/1/release | 200 | 200 | ✅ |
+| 10 | Swagger UI (публичный) | GET | /swagger-ui.html | 302/200 | 302 | ✅ |
+| 11 | POST /api/hotels с невалидным токеном | POST | /api/hotels | **401** | **401** | ✅ |
+
+**Ключевое исправление:** Все POST/PATCH/DELETE без токена теперь возвращают **401 Unauthorized** вместо **403 Forbidden**.
+
+### Логи компиляции
+
+```
+mvn clean compile — BUILD SUCCESS
+Compiling 24 source files (6 новых файлов: JwtUtil, JwtAuthenticationFilter, SecurityConfig обновлён)
+Started HotelServiceApplication in 4.26 seconds
+```
+
+### Замечания
+
+- JDK в системе: **OpenJDK 25.0.1** — совместимость подтверждена
+- Eureka Server не запущен — ошибки `Connect to http://localhost:8761 failed: Connection refused` ожидаемы
+- **Spring Security 6.x PathPatternParser**: `**` разрешён только в конце пути. Паттерн `{roomId}` использован вместо `**/confirm-availability`
+- `AntPathRequestMatcher` устарел в Spring Security 6.x — использованы строковые паттерны напрямую в `requestMatchers`
+- `@PreAuthorize("hasRole('ADMIN')")` автоматически добавляет префикс `ROLE_` к роли из JWT
+- `AuthenticationEntryPoint` вынесен в `@Bean` для корректной инъекции в `securityFilterChain`
+- Исправление 403→403: `instanceof AnonymousAuthenticationToken` позволяет отличить анонимного пользователя от аутентифицированного
+
+### Файлы созданные/изменённые на этом этапе
+
+| Файл | Действие |
+|------|----------|
+| `hotel-service/.../config/JwtUtil.java` | **Создан** — утилита работы с JWT |
+| `hotel-service/.../config/JwtAuthenticationFilter.java` | **Создан** — JWT-фильтр OncePerRequestFilter |
+| `hotel-service/.../config/SecurityConfig.java` | **Перезаписан** — полная JWT-конфигурация + `@EnableMethodSecurity` |
+| `hotel-service/.../controller/RoomController.java` | **Изменён** — добавлен `@Hidden` к внутренним эндпоинтам |
+| `hotel-service/.../exception/GlobalExceptionHandler.java` | **Изменён** — 401 вместо 403 для неавторизованных запросов |
+
 ### Следующий этап
-**Этап 6: Hotel Service — безопасность и Swagger**
+**Этап 7: Booking Service — сущности и репозитории**

@@ -1,5 +1,6 @@
 package com.skillfactory.luzhin.hotelservice.repository;
 
+import com.skillfactory.luzhin.hotelservice.entity.Booking;
 import com.skillfactory.luzhin.hotelservice.entity.Room;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -54,9 +55,9 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
      */
     @Query("SELECT b FROM Booking b WHERE b.roomId = :roomId AND b.status IN ('PENDING', 'CONFIRMED') "
             + "AND b.startDate < :end AND b.endDate > :start")
-    List<Room> findOverlappingBookings(@Param("roomId") Long roomId,
-                                       @Param("start") LocalDateTime start,
-                                       @Param("end") LocalDateTime end);
+    List<Booking> findOverlappingBookings(@Param("roomId") Long roomId,
+                                          @Param("start") LocalDateTime start,
+                                          @Param("end") LocalDateTime end);
 
     /**
      * Находит номер по идентификатору вместе с информацией об отеле.

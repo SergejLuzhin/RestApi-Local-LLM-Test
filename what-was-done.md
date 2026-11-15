@@ -619,6 +619,3 @@ Started HotelServiceApplication in 4.26 seconds
 | `hotel-service/.../config/SecurityConfig.java` | **Перезаписан** — полная JWT-конфигурация + `@EnableMethodSecurity` |
 | `hotel-service/.../controller/RoomController.java` | **Изменён** — добавлен `@Hidden` к внутренним эндпоинтам |
 | `hotel-service/.../exception/GlobalExceptionHandler.java` | **Изменён** — 401 вместо 403 для неавторизованных запросов |
-
-### Следующий этап
-**Этап 7: Booking Service — сущности и репозитории**

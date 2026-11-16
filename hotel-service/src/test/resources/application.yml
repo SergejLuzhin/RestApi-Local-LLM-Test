@@ -1,0 +1,19 @@
+server:
+  port: 0
+
+spring:
+  cloud:
+    discovery:
+      enabled: false
+  main:
+    allow-bean-definition-overriding: true
+
+eureka:
+  client:
+    enabled: false
+    register-with-eureka: false
+    fetch-registry: false
+
+jwt:
+  secret: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXpBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWjEyMzQ1Njc4OTA=
+  expiration-ms: 3600000

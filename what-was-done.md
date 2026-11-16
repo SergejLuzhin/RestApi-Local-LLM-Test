@@ -619,3 +619,246 @@ Started HotelServiceApplication in 4.26 seconds
 | `hotel-service/.../config/SecurityConfig.java` | **Перезаписан** — полная JWT-конфигурация + `@EnableMethodSecurity` |
 | `hotel-service/.../controller/RoomController.java` | **Изменён** — добавлен `@Hidden` к внутренним эндпоинтам |
 | `hotel-service/.../exception/GlobalExceptionHandler.java` | **Изменён** — 401 вместо 403 для неавторизованных запросов |
+
+---
+
+## Этап 7.1: Hotel Controller Tests — `HotelControllerTest`
+
+### Дата выполнения
+16 ноября 2026
+
+### Что сделано
+
+#### 1. Создан тестовый класс `HotelControllerTest`
+
+**Файл:** `hotel-service/src/test/java/.../controller/HotelControllerTest.java`
+
+10 тестов (`H-CT-1` до `H-CT-10`) по плану Этапа 7:
+
+| # | Тест | Метод | Что проверяет | Результат |
+|---|------|-------|---------------|-----------|
+| H-CT-1 | `shouldCreateHotelWithAdminRole` | POST /api/hotels | Валидные данные, токен ADMIN | ✅ 201 |
+| H-CT-2 | `shouldRejectEmptyBodyOnCreateHotel` | POST /api/hotels | Пустое тело | ✅ 400 |
+| H-CT-3 | `shouldRejectHotelCreationWithoutToken` | POST /api/hotels | Без токена | ✅ 401 |
+| H-CT-4 | `shouldRejectHotelCreationWithUserRole` | POST /api/hotels | Токен ROLE_USER | ✅ 403 |
+| H-CT-5 | `shouldGetHotelsListWithoutToken` | GET /api/hotels | Публичный доступ | ✅ 200 |
+| H-CT-6 | `shouldGetHotelByIdWithUserRole` | GET /api/hotels/1 | Токен USER | ✅ 200 |
+| H-CT-7 | `shouldReturnNotFoundForMissingHotel` | GET /api/hotels/999 | Нет такого отеля | ✅ 404 |
+| H-CT-8 | `shouldUpdateHotelWithAdminRole` | PATCH /api/hotels/1 | ADMIN + валидные данные | ✅ 200 |
+| H-CT-9 | `shouldDeleteHotelWithAdminRole` | DELETE /api/hotels/1 | ADMIN | ✅ 204 |
+| H-CT-10 | `shouldReturnNotFoundWhenDeletingMissingHotel` | DELETE /api/hotels/999 | Нет такого отеля | ✅ 404 |
+
+**Результат:** `Tests run: 10, Failures: 0, Errors: 0, BUILD SUCCESS`
+
+#### 2. Создан тестовый `application.yml`
+
+**Файл:** `hotel-service/src/test/resources/application.yml`
+
+Конфигурация для тестового контекста:
+- `server.port: 0` — случайный порт
+- `spring.cloud.discovery.enabled: false` — отключение Eureka
+- `eureka.client.enabled: false` — отключение Eureka Client
+- `jwt.secret` — корректный Base64-секрет (44 символа, 32 байта после декодирования)
+- `spring.main.allow-bean-definition-overriding: true` — разрешение переопределения бэнов
+
+#### 3. Добавлена зависимость `spring-security-test`
+
+**Файл:** `hotel-service/pom.xml`
+
+```xml
+<dependency>
+    <groupId>org.springframework.security</groupId>
+    <artifactId>spring-security-test</artifactId>
+    <scope>test</scope>
+</dependency>
+```
+
+Необходима для `SecurityMockMvcConfigurers.springSecurity()` при ручной настройке MockMvc.
+
+---
+
+### Принятые архитектурные решения
+
+#### Решение 1: `@SpringBootTest` вместо `@WebMvcTest`
+
+**Проблема:** `@WebMvcTest` с `HotelServiceApplication` как main-классом загружает полный `@ComponentScan`, который включает `JwtUtil` и `JwtAuthenticationFilter`. При этом `JwtAuthenticationFilter` (создаваемый через Lombok `@RequiredArgsConstructor`) требует `JwtUtil` в конструкторе, но `JwtUtil` не доступен в `@WebMvcTest` контексте (не сканируется как `@Controller`).
+
+**Неудачные попытки:**
+1. `@MockBean JwtAuthenticationFilter` + `@WebMvcTest` — ломает авто-конфигурацию MockMvc
+2. `@MockBean JwtUtil` + `@WebMvcTest` — ломает авто-конфигурацию MockMvc
+3. `@WebMvcTest` + кастомный `SecurityFilterChain` в `@TestConfiguration` — ошибка «Test classes cannot include @Bean methods»
+4. `@WebMvcTest` + `@ComponentScan` с фильтрами — пытается загрузить все компоненты, включая `JwtAuthenticationFilter` без `JwtUtil`
+
+**Итоговое решение:** `@SpringBootTest(webEnvironment = MOCK)` — загружает полный контекст приложения, но в mock-веб-окружении без реального сервера. Это позволяет `JwtUtil` и `JwtAuthenticationFilter` корректно инициализироваться из `@ComponentScan` main-класса.
+
+#### Решение 2: Ручная настройка MockMvc вместо `@AutoConfigureMockMvc`
+
+**Проблема:** `@AutoConfigureMockMvc` не срабатывает из-за `web-application-type: none` в тестовом `application.yml` (установлено для отключения веб-сервера). Даже при изменении на `MOCK`, `@AutoConfigureMockMvc` не авто-конфигурируется корректно с `@SpringBootTest` в данной конфигурации.
+
+**Итоговое решение:** Ручная настройка MockMvc:
+```java
+mockMvc = MockMvcBuilders.webAppContextSetup(wac)
+    .apply(springSecurity())
+    .build();
+```
+
+Это даёт полный контроль над цепочкой фильтров, включая Spring Security.
+
+#### Решение 3: JWT Secret — корректный Base64
+
+**Проблема:** Исходный секрет `mySecretKey12345678901234567890123456789012345678901234567890` (61 символ) невалиден для Base64-декодирования (61 не кратно 4).
+
+**Решение:** Использовать корректный Base64-секрет (44 символа, кратно 4):
+```
+YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXpBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWjEyMzQ1Njc4OTA=
+```
+Это Base64 для строки длиной 46 байт, что достаточно для HS256 (минимум 32 байта).
+
+---
+
+### Золотые правила для написания автотестов (Stage 7+)
+
+> ⚠️ **ВАЖНО:** Эти правила предотвращают типичные ошибки при тестировании Spring Boot микросервисов с JWT-безопасностью.
+
+#### Правило 1: Использовать `@SpringBootTest(webEnvironment = MOCK)` вместо `@WebMvcTest`
+
+При наличии `@Component` классов (JwtUtil, JwtAuthenticationFilter, SecurityConfig), которые зависят друг от друга и сканируются через `@SpringBootApplication`, `@WebMvcTest` не может корректно загрузить контекст. `@SpringBootTest(webEnvironment = MOCK)` загружает полный контекст в mock-окружении, что решает все проблемы.
+
+#### Правило 2: Настроить MockMvc вручную через `MockMvcBuilders`
+
+```java
+mockMvc = MockMvcBuilders.webAppContextSetup(wac)
+    .apply(springSecurity())
+    .build();
+```
+
+Не полагаться на `@AutoConfigureMockMvc` — он может не работать при нестандартных конфигурациях.
+
+#### Правило 3: JWT Secret должен быть корректным Base64
+
+- Длина должна быть **кратно 4** (или с `=` padding)
+- Минимум **44 символа** (32 байта после декодирования) для HS256
+- Только Base64-символы: `A-Z`, `a-z`, `0-9`, `+`, `/`, `=`
+
+#### Правило 4: Тестовый `application.yml` должен отключать внешние зависимости
+
+```yaml
+spring:
+  cloud:
+    discovery:
+      enabled: false
+  main:
+    allow-bean-definition-overriding: true
+eureka:
+  client:
+    enabled: false
+```
+
+#### Правило 5: Добавить `spring-security-test` как test-зависимость
+
+```xml
+<dependency>
+    <groupId>org.springframework.security</groupId>
+    <artifactId>spring-security-test</artifactId>
+    <scope>test</scope>
+</dependency>
+```
+
+Необходима для `SecurityMockMvcConfigurers.springSecurity()`.
+
+---
+
+### Проверки
+
+| Проверка | Результат |
+|----------|-----------|
+| `mvn test -Dtest=HotelControllerTest` | ✅ BUILD SUCCESS |
+| 10 тестов прошли | ✅ 10/10 |
+| JWT аутентификация работает | ✅ |
+| Разграничение ролей (USER vs ADMIN) | ✅ |
+| Валидация входных данных | ✅ |
+| 404 для несуществующих ресурсов | ✅ |
+
+### Файлы созданные/изменённые на этом этапе
+
+| Файл | Действие |
+|------|----------|
+| `hotel-service/pom.xml` | **Изменён** — добавлен `spring-security-test`, изменён JWT scope |
+| `hotel-service/src/test/resources/application.yml` | **Создан** — тестовая конфигурация |
+| `hotel-service/.../controller/HotelControllerTest.java` | **Создан** — 10 тестов контроллера |
+
+---
+
+## Этап 7.2: RoomControllerTest — тесты контроллера номеров
+
+### Дата выполнения
+16 ноября 2026
+
+### Что сделано
+
+#### 1. Создан тестовый класс `RoomControllerTest`
+
+**Файл:** `hotel-service/src/test/java/.../controller/RoomControllerTest.java`
+
+10 тестов (`H-RT-1` до `H-RT-10`) по плану Этапа 7:
+
+| # | Тест | Метод | Путь | Что проверяет | Ожидаемый результат |
+|---|------|-------|------|---------------|---------------------|
+| H-RT-1 | Создание номера | `POST` /api/rooms | Токен ADMIN, валидные данные | `201 Created`, id, hotelId, number | ✅ |
+| H-RT-2 | Создание без токена | `POST` /api/rooms | Отсутствие JWT | `401 Unauthorized` | ✅ |
+| H-RT-3 | Создание с hotelId=999 | `POST` /api/rooms | Отель не существует | `404 Not Found` | ✅ |
+| H-RT-4 | Создание без hotelId | `POST` /api/rooms | Валидация @NotNull | `400 Bad Request` | ✅ |
+| H-RT-5 | Получение доступных номеров | `GET` /api/rooms | Публичный доступ | `200 OK`, список номеров | ✅ |
+| H-RT-6 | Рекомендованные номера | `GET` /api/rooms/recommend | Публичный доступ | `200 OK`, сортировка timesBooked | ✅ |
+| H-RT-7 | Подтверждение доступности | `POST` /api/rooms/1/confirm-availability | Нет пересечений | `200 OK` | ✅ |
+| H-RT-8 | Подтверждение — пересечение | `POST` /api/rooms/1/confirm-availability | Есть пересечение | `409 Conflict` | ✅ |
+| H-RT-9 | Снятие блокировки | `POST` /api/rooms/1/release | Блокировка существует | `200 OK` | ✅ |
+| H-RT-10 | Release без блокировки | `POST` /api/rooms/1/release | Нет блокировки | `200 OK` | ✅ |
+
+**Результат:** `Tests run: 10, Failures: 0, Errors: 0, BUILD SUCCESS`
+
+### Особенности реализации
+
+#### Решение: Использование `@SpringBootTest(webEnvironment = MOCK)`
+
+Тот же подход, что и в `HotelControllerTest`. Полный контекст приложения загружается в mock-окружении, что позволяет `JwtAuthenticationFilter` и `JwtUtil` корректно инициализироваться.
+
+#### Ручная настройка MockMvc
+
+```java
+mockMvc = MockMvcBuilders.webAppContextSetup(wac)
+    .apply(springSecurity())
+    .build();
+```
+
+#### Паттерн запроса с `@RequestParam`
+
+Для эндпоинтов `confirm-availability` и `release` используются query-параметры:
+```java
+.param("start", start.toString())
+.param("end", end.toString())
+.param("correlationId", "test-correlation-001")
+```
+
+`LocalDateTime` сериализуется в ISO-8601 строку автоматически.
+
+### Проверки
+
+| Проверка | Результат |
+|----------|-----------|
+| `mvn test -Dtest=RoomControllerTest` | ✅ BUILD SUCCESS |
+| 10 тестов прошли | ✅ 10/10 |
+| JWT аутентификация | ✅ 401 без токена |
+| Валидация данных | ✅ 400 при отсутствии hotelId |
+| 404 при несуществующем отеле | ✅ |
+| 409 при пересечении бронирований | ✅ |
+| 200 при отсутствии блокировки | ✅ |
+
+### Файлы созданные/изменённые на этом этапе
+
+| Файл | Действие |
+|------|----------|
+| `hotel-service/.../controller/RoomControllerTest.java` | **Создан** — 10 тестов контроллера |
+
+### Следующий этап
+**Этап 7.3: `RoomServiceTest` — unit-тесты сервиса номеров**

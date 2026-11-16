@@ -860,5 +860,75 @@ mockMvc = MockMvcBuilders.webAppContextSetup(wac)
 |------|----------|
 | `hotel-service/.../controller/RoomControllerTest.java` | **Создан** — 10 тестов контроллера |
 
+
+---
+
+## Этап 7.3: RoomServiceTest — unit-тесты сервиса номеров
+
+### Дата выполнения
+16 ноября 2026
+
+### Что сделано
+
+#### 1. Создан тестовый класс `RoomServiceTest`
+
+**Файл:** `hotel-service/src/test/java/.../service/RoomServiceTest.java`
+
+8 тестов (`H-RS-1` до `H-RS-8`) по плану Этапа 7:
+
+| # | Тест | Метод | Что проверяет | Ожидаемый результат |
+|---|------|-------|---------------|---------------------|
+| H-RS-1 | Создание номера | `createRoom()` | `HotelRepository.findById()` + `RoomRepository.save()` | `RoomResponse` с id, number, hotelName |
+| H-RS-2 | Получение всех доступных номеров | `getAllAvailableRooms()` | `RoomRepository.findByAvailableTrue()` | Список номеров, все `available=true` |
+| H-RS-3 | Получение рекомендованных номеров | `getRecommendedRooms()` | `RoomRepository.findByAvailableTrueOrderByTimesBookedAscIdAsc()` | Сортировка `timesBooked=0` перед `timesBooked=1` |
+| H-RS-4 | Подтверждение доступности — успешно | `confirmAvailability()` | Нет пересекающихся бронирований | `bookingRepository.save()` вызван |
+| H-RS-5 | Подтверждение — занято | `confirmAvailability()` | `findOverlappingBookings()` возвращает список | `RoomNotAvailableException` |
+| H-RS-6 | Подтверждение — номер не найден | `confirmAvailability(999)` | `findByIdWithHotel(999)` = empty | `ResourceNotFoundException` |
+| H-RS-7 | Снятие блокировки | `releaseSlot()` | `BookingRepository.deleteTemporaryBookings()` | Без исключения |
+| H-RS-8 | Подтверждение — непересекающиеся даты | `confirmAvailability()` | Нет пересечений с существующим бронированием | `bookingRepository.save()` вызван |
+
+**Результат:** `Tests run: 8, Failures: 0, Errors: 0, BUILD SUCCESS`
+
+### Особенности реализации
+
+#### Unit-тесты без Spring-контекста
+
+В отличие от контроллерных тестов, сервисные тесты не требуют загрузки Spring-контекста. Используются:
+- `@ExtendWith(MockitoExtension.class)` — автоматическая инициализация моков
+- `@Mock` — моки репозиториев и маппера
+- `@InjectMocks` — автоматическая инъекция моков в `RoomService`
+
+#### Верификация вызовов моков
+
+Каждый тест проверяет не только результат, но и то, какие методы были вызваны:
+```java
+verify(roomRepository, times(1)).findByIdWithHotel(roomId);
+verify(bookingRepository, never()).save(any(Booking.class));
+```
+
+#### Тестовые данные
+
+Общие тестовые объекты (`testHotel`, `testRoom`) инициализируются в `@BeforeEach`, чтобы каждый тест начинался с чистого состояния.
+
+### Проверки
+
+| Проверка | Результат |
+|----------|-----------|
+| `mvn test -Dtest=RoomServiceTest` | ✅ BUILD SUCCESS |
+| 8 тестов прошли | ✅ 8/8 |
+| CRUD номера (создание) | ✅ |
+| Сортировка рекомендованных | ✅ timesBooked ASC |
+| Подтверждение доступности (успех) | ✅ save вызван |
+| Подтверждение — пересечение | ✅ RoomNotAvailableException |
+| Подтверждение — номер не найден | ✅ ResourceNotFoundException |
+| Снятие блокировки | ✅ deleteTemporaryBookings |
+| Непересекающиеся даты | ✅ save вызван |
+
+### Файлы созданные/изменённые на этом этапе
+
+| Файл | Действие |
+|------|----------|
+| `hotel-service/.../service/RoomServiceTest.java` | **Создан** — 8 unit-тестов сервиса |
+
 ### Следующий этап
-**Этап 7.3: `RoomServiceTest` — unit-тесты сервиса номеров**
+**Этап 7.4: `HotelServiceTest` — unit-тесты сервиса отелей**

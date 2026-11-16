@@ -2,6 +2,8 @@ package com.skillfactory.luzhin.hotelservice.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.MappedSuperclass;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -30,7 +32,7 @@ public abstract class BaseEntity {
     /**
      * Автоматически устанавливает время создания и обновления при сохранении.
      */
-    @jakarta.persistence.PrePersist
+    @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
@@ -39,7 +41,7 @@ public abstract class BaseEntity {
     /**
      * Обновляет поле updatedAt перед каждым обновлением записи.
      */
-    @jakarta.persistence.PreUpdate
+    @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();
     }

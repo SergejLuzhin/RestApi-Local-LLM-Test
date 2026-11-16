@@ -3,7 +3,7 @@ package com.skillfactory.luzhin.bookingservice.entity;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
@@ -34,7 +34,7 @@ import java.time.LocalDateTime;
            @Index(name = "idx_booking_correlation_id", columnList = "correlation_id"),
            @Index(name = "idx_booking_room_id_start_end", columnList = "room_id, start_date, end_date")
        })
-@Data
+@Getter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor

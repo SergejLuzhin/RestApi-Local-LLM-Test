@@ -3,7 +3,7 @@ package com.skillfactory.luzhin.bookingservice.entity;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
@@ -25,7 +25,7 @@ import java.time.LocalDateTime;
  */
 @Entity
 @Table(name = "users")
-@Data
+@Getter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -87,7 +87,10 @@ public class User {
     /**
      * Метод-колбэк, вызываемый перед обновлением записи.
      * Устанавливает дату и время последнего обновления.
+     * Lombok @Getter генерирует только getter, setter отсутствует,
+     * что предотвращает конфликты с JPA lifecycle callback.
      */
+    @SuppressWarnings("squid:S1192")
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();

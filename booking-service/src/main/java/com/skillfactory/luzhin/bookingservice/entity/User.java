@@ -10,11 +10,11 @@ import java.time.LocalDateTime;
 
 /**
  * Сущность JPA «Пользователь системы».
- *
+ * <p>
  * Представляет пользователя, который может взаимодействовать с системой бронирования.
  * Каждый пользователь имеет уникальное имя, хешированный пароль и роль доступа.
  * Пароли хранятся в зашифрованном виде (BCrypt).
- *
+ * <p>
  * Поля:
  * - id — уникальный идентификатор (автогенерация);
  * - username — уникальное имя пользователя для входа;
@@ -42,7 +42,7 @@ public class User {
      * Уникальное имя пользователя для входа в систему.
      * Уникальность обеспечивается индексом на уровне базы данных.
      */
-    @Column(nullable = false, unique = true, length = 255)
+    @Column(nullable = false, unique = true)
     private String username;
 
     /**
@@ -76,21 +76,22 @@ public class User {
     private LocalDateTime updatedAt;
 
     /**
-     * Метод-колбэк, вызываемый перед сохранением новой записи.
-     * Устанавливает дату и время создания.
+     * Метод-колбэк JPA, вызываемый перед сохранением новой записи.
+     * Устанавливает дату и время создания через Hibernate.
      */
+    @SuppressWarnings("unused")
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
     }
 
     /**
-     * Метод-колбэк, вызываемый перед обновлением записи.
-     * Устанавливает дату и время последнего обновления.
+     * Метод-колбэк JPA, вызываемый перед обновлением записи.
+     * Устанавливает дату и время последнего обновления через Hibernate.
      * Lombok @Getter генерирует только getter, setter отсутствует,
      * что предотвращает конфликты с JPA lifecycle callback.
      */
-    @SuppressWarnings("squid:S1192")
+    @SuppressWarnings("unused")
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();

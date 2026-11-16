@@ -10,13 +10,13 @@ import java.time.LocalDateTime;
 
 /**
  * Сущность JPA «Бронирование».
- *
+ * <p>
  * Представляет бронирование номера в отеле, связанное с конкретным пользователем.
  * Бронирование имеет статус, определяющий текущую стадию процесса:
  * PENDING — ожидает подтверждения от Hotel Service;
  * CONFIRMED — подтверждено и активно;
  * CANCELLED — отменено.
- *
+ * <p>
  * Поля:
  * - id — уникальный идентификатор бронирования (автогенерация);
  * - user — пользователь, создавший бронирование;
@@ -98,9 +98,10 @@ public class Booking {
     private String correlationId;
 
     /**
-     * Метод-колбэк, вызываемый перед сохранением новой записи.
-     * Устанавливает дату и время создания.
+     * Метод-колбэк JPA, вызываемый перед сохранением новой записи.
+     * Устанавливает дату и время создания через Hibernate.
      */
+    @SuppressWarnings("unused")
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
@@ -113,6 +114,7 @@ public class Booking {
      * @param end   дата окончания проверяемого периода
      * @return true, если даты пересекаются; false в противном случае
      */
+    @SuppressWarnings("unused")
     public boolean hasDateOverlap(LocalDateTime start, LocalDateTime end) {
         return this.startDate.isBefore(end) && this.endDate.isAfter(start);
     }

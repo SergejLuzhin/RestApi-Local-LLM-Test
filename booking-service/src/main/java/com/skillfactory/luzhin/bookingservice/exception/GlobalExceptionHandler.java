@@ -149,6 +149,61 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Обработчик ошибки аутентификации.
+     * Возвращает HTTP 401 Unauthorized при ошибках JWT-валидации или невалидном токене.
+     *
+     * @param exception исключение аутентификации
+     * @return ResponseEntity с HTTP 401 и JSON-описанием ошибки
+     */
+    @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
+    public ResponseEntity<ErrorResponse> handleAuthenticationException(
+            org.springframework.security.core.AuthenticationException exception) {
+        ErrorResponse error = new ErrorResponse(
+                Instant.now(),
+                HttpStatus.UNAUTHORIZED.value(),
+                HttpStatus.UNAUTHORIZED.getReasonPhrase(),
+                exception.getMessage()
+        );
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
+    }
+
+    /**
+     * Обработчик ошибки некорректного аргумента (например, занятое имя пользователя, неверный пароль).
+     * Возвращает HTTP 400 Bad Request с сообщением об ошибке.
+     *
+     * @param exception исключение некорректного аргумента
+     * @return ResponseEntity с HTTP 400 и JSON-описанием ошибки
+     */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException exception) {
+        ErrorResponse error = new ErrorResponse(
+                Instant.now(),
+                HttpStatus.BAD_REQUEST.value(),
+                HttpStatus.BAD_REQUEST.getReasonPhrase(),
+                exception.getMessage()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    /**
+     * Обработчик ошибки неправильного состояния (например, повторная отмена бронирования).
+     * Возвращает HTTP 400 Bad Request с сообщением об ошибке.
+     *
+     * @param exception исключение неправильного состояния
+     * @return ResponseEntity с HTTP 400 и JSON-описанием ошибки
+     */
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalState(IllegalStateException exception) {
+        ErrorResponse error = new ErrorResponse(
+                Instant.now(),
+                HttpStatus.BAD_REQUEST.value(),
+                HttpStatus.BAD_REQUEST.getReasonPhrase(),
+                exception.getMessage()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    /**
      * Обработчик неизвестных исключений.
      *
      * @param exception любое необработанное исключение

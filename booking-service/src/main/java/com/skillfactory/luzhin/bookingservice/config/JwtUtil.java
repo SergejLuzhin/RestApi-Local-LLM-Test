@@ -52,23 +52,52 @@ public class JwtUtil {
     }
 
     /**
-     * Генерирует JWT-токен для указанного пользователя с указанной ролью.
+     * Генерирует JWT-токен для указанного пользователя с указанной ролью и идентификатором.
+     *
+     * @param userId   идентификатор пользователя
+     * @param username имя пользователя
+     * @param role     роль пользователя (формат "ROLE_USER" или "ROLE_ADMIN")
+     * @return сгенерированный JWT-токен
+     */
+    public String generateToken(Long userId, String username, String role) {
+        Date now = new Date();
+        Date expirationDate = new Date(now.getTime() + expirationMs);
+
+        return Jwts.builder()
+                .subject(username)
+                .claim("userId", userId)
+                .claim("role", role)
+                .issuedAt(now)
+                .expiration(expirationDate)
+                .signWith(signingKey)
+                .compact();
+    }
+
+    /**
+     * Генерирует JWT-токен для указанного пользователя с указанной ролью (без userId).
      *
      * @param username имя пользователя
      * @param role     роль пользователя (формат "ROLE_USER" или "ROLE_ADMIN")
      * @return сгенерированный JWT-токен
      */
     public String generateToken(String username, String role) {
-        Date now = new Date();
-        Date expirationDate = new Date(now.getTime() + expirationMs);
+        return generateToken(null, username, role);
+    }
 
-        return Jwts.builder()
-                .subject(username)
-                .claim("role", role)
-                .issuedAt(now)
-                .expiration(expirationDate)
-                .signWith(signingKey)
-                .compact();
+    /**
+     * Извлекает идентификатор пользователя из JWT-токена.
+     *
+     * @param token JWT-токен
+     * @return идентификатор пользователя, извлечённый из claims токена
+     * @throws io.jsonwebtoken.JwtException если токен невалиден или userId не найден
+     */
+    public Long getUserId(String token) {
+        Claims claims = extractAllClaims(token);
+        Object userId = claims.get("userId");
+        if (userId == null) {
+            throw new io.jsonwebtoken.JwtException("User ID not found in token");
+        }
+        return Long.valueOf(userId.toString());
     }
 
     /**

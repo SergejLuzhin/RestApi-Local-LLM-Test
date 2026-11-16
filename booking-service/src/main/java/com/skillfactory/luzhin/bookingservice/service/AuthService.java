@@ -93,7 +93,7 @@ public class AuthService {
         User savedUser = userRepository.save(user);
 
         // Генерируем JWT-токен для нового пользователя
-        String token = jwtUtil.generateToken(savedUser.getUsername(), "ROLE_USER");
+        String token = jwtUtil.generateToken(savedUser.getId(), savedUser.getUsername(), "ROLE_USER");
 
         // Формируем ответ с токеном
         UserResponse response = userMapper.toResponse(savedUser);
@@ -130,7 +130,7 @@ public class AuthService {
 
         // Генерируем JWT-токен с ролью пользователя
         String role = "ROLE_" + user.getRole().name();
-        String token = jwtUtil.generateToken(user.getUsername(), role);
+        String token = jwtUtil.generateToken(user.getId(), user.getUsername(), role);
 
         // Формируем ответ с токеном
         UserResponse response = userMapper.toResponse(user);

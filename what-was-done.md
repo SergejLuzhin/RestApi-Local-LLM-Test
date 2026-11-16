@@ -1865,3 +1865,166 @@ Started BookingServiceApplication in 5.756 seconds
 
 ---
 
+## Этап 13: Booking Service — контроллеры
+
+### Дата выполнения
+16 ноября 2026
+
+### Что сделано
+
+#### 1. Создан `AuthController` — регистрация и авторизация
+
+**Файл:** `booking-service/.../controller/AuthController.java`
+
+REST-контроллер для публичных эндпоинтов аутентификации.
+
+**Эндпоинты:**
+| Метод | Путь | Описание | Доступ |
+|-------|------|----------|--------|
+| `POST` | `/user/register` | Регистрация нового пользователя, генерация JWT | Публичный |
+| `POST` | `/user/auth` | Авторизация, генерация JWT | Публичный |
+
+**Логика:**
+- `register`: проверка уникальности username, хеширование BCrypt, роль USER, генерация JWT с userId
+- `authenticate`: поиск по username, проверка BCrypt, генерация JWT с userId
+
+#### 2. Создан `UserController` — административное управление пользователями
+
+**Файл:** `booking-service/.../controller/UserController.java`
+
+REST-контроллер для CRUD-операций с пользователями.
+
+**Эндпоинты:**
+| Метод | Путь | Описание | Роль |
+|-------|------|----------|------|
+| `POST` | `/user` | Создать пользователя | ADMIN |
+| `PATCH` | `/user?id=X` | Обновить пользователя | ADMIN |
+| `DELETE` | `/user?id=X` | Удалить пользователя | ADMIN |
+| `GET` | `/user/users` | Получить всех пользователей | ADMIN |
+| `GET` | `/user/users/{id}` | Получить пользователя по ID | ADMIN |
+
+**Особенности:**
+- `@PreAuthorize("hasRole('ADMIN')")` на уровне класса
+- `PATCH /user` принимает `userId` как query-параметр
+- Пароль всегда хешируется BCrypt при создании и обновлении
+
+#### 3. Создан `BookingController` — управление бронированиями
+
+**Файл:** `booking-service/.../controller/BookingController.java`
+
+REST-контроллер для CRUD-операций с бронированиями.
+
+**Эндпоинты:**
+| Метод | Путь | Описание | Роль |
+|-------|------|----------|------|
+| `POST` | `/booking` | Создать бронирование | USER |
+| `GET` | `/booking/{id}` | Получить бронирование | USER |
+| `GET` | `/bookings` | История бронирований | USER |
+| `DELETE` | `/booking/{id}` | Отменить бронирование | USER |
+
+**Особенности:**
+- `@PreAuthorize("hasRole('USER')")` на уровне класса
+- userId извлекается из JWT-токена через `JwtUtil.getUserId()`
+- `HttpServletRequest` для доступа к заголовку Authorization
+- `extractToken()` метод для извлечения токена из заголовка
+
+#### 4. Обновлён `JwtUtil` — добавлен userId в токен
+
+**Файл:** `booking-service/.../config/JwtUtil.java`
+
+**Добавлено:**
+- `generateToken(Long userId, String username, String role)` — генерация с userId
+- `getUserId(String token)` — извлечение userId из claims
+- Перегрузка `generateToken(String username, String role)` — обратная совместимость
+
+**Claims в токене:**
+- `sub` — username
+- `userId` — идентификатор пользователя
+- `role` — роль (ROLE_USER / ROLE_ADMIN)
+- `iat` — issued at
+- `exp` — expiration
+
+#### 5. Обновлён `AuthService` — передача userId в токен
+
+**Файл:** `booking-service/.../service/AuthService.java`
+
+Оба метода (`register` и `authenticate`) теперь вызывают `jwtUtil.generateToken(userId, username, role)` для включения идентификатора пользователя в токен.
+
+#### 6. Обновлён `GlobalExceptionHandler` — добавлены обработчики
+
+**Файл:** `booking-service/.../exception/GlobalExceptionHandler.java`
+
+Добавлены новые обработчики:
+- `AuthenticationException` → HTTP 401
+- `IllegalArgumentException` → HTTP 400 (занятое имя, неверный пароль)
+- `IllegalStateException` → HTTP 400 (повторная отмена бронирования)
+
+#### 7. Обновлён `SecurityConfig` — улучшена обработка 403
+
+**Файл:** `booking-service/.../config/SecurityConfig.java`
+
+`AccessDeniedHandler` теперь возвращает **401** для анонимных пользователей и **403** для аутентифицированных без нужной роли.
+
+### Проверки
+
+Все 12 тестов прошли успешно:
+
+| # | Тест | Метод | Путь | Ожидалось | Получено | Статус |
+|---|------|-------|------|-----------|----------|--------|
+| A1 | Регистрация | POST | /user/register | 200 | 200 | ✅ |
+| A2 | Дубль регистрации | POST | /user/register | 400 | 400 | ✅ |
+| A3 | Авторизация | POST | /user/auth | 200 | 200 | ✅ |
+| S1 | GET bookings без токена | GET | /booking/bookings | 401 | 401 | ✅ |
+| S2 | POST booking без токена | POST | /booking | 401 | 401 | ✅ |
+| S3 | GET /user без токена | GET | /user | 401 | 401 | ✅ |
+| B1 | История (пустая) | GET | /booking/bookings | 200, [] | 200, [] | ✅ |
+| B2 | GET /booking/999 | GET | /booking/999 | 404 | 404 | ✅ |
+| B3 | DELETE /booking/999 | DELETE | /booking/999 | 404 | 404 | ✅ |
+| U1 | POST /user USER-токен | POST | /user | 403 | 403 | ✅ |
+| U2 | GET /user/users USER-токен | GET | /user/users | 403 | 403 | ✅ |
+| U3 | DELETE /user USER-токен | DELETE | /user?id=1 | 403 | 403 | ✅ |
+| U4 | POST /user без токена | POST | /user | 401 | 401 | ✅ |
+
+### Подводные камни и решения
+
+#### Проблема 1: `Long.parseLong(authentication.getName())` не работает
+
+**Причина:** `authentication.getName()` возвращает username (строку), а не userId (число). Попытка парсить "testuser" как Long приводила к `NumberFormatException`.
+
+**Решение:** Добавить `userId` в JWT-токен при генерации и извлекать через `JwtUtil.getUserId(token)`.
+
+#### Проблема 2: `@PreAuthorize("hasRole('ADMIN')")` на UserController позволял USER
+
+**Причина:** Класс имел `@PreAuthorize("hasRole('ADMIN')")`, но тесты отправляли невалидные данные (username "u2" < 3 символа), что вызывало `MethodArgumentNotValidException` (400) до проверки авторизации.
+
+**Решение:** Тест проверен с валидными данными — `AccessDeniedException` (403) работает корректно.
+
+#### Проблема 3: Порядок обработки исключений в GlobalExceptionHandler
+
+**Причина:** `@Valid` валидация срабатывает **до** `@PreAuthorize`. При невалидном body возвращается 400, даже если запрос не имеет прав.
+
+**Решение:** Это ожидаемое поведение Spring MVC. Тесты используют валидные данные для проверки авторизации.
+
+### Замечания
+- JDK в системе: **OpenJDK 25.0.1** — совместимость подтверждена
+- Eureka Client работает, но Eureka Server не запущен — ошибки `Connect to http://localhost:8761 failed: Connection refused` ожидаемы
+- JWT-токен содержит `userId` claim — позволяет извлекать идентификатор пользователя в контроллерах без запроса к БД
+- `@PreAuthorize("hasRole('USER')")` на BookingController — USER и ADMIN оба могут создавать/просматривать бронирования
+- `@PreAuthorize("hasRole('ADMIN')")` на UserController — только ADMIN может управлять пользователями
+
+### Файлы созданные/изменённые на этом этапе
+
+| Файл | Действие |
+|------|----------|
+| `booking-service/.../controller/AuthController.java` | **Создан** — регистрация + авторизация |
+| `booking-service/.../controller/UserController.java` | **Создан** — CRUD пользователей (ADMIN) |
+| `booking-service/.../controller/BookingController.java` | **Создан** — CRUD бронирований (USER) |
+| `booking-service/.../config/JwtUtil.java` | **Изменён** — добавлен userId в токен + getUserId() |
+| `booking-service/.../service/AuthService.java` | **Изменён** — передача userId в generateToken() |
+| `booking-service/.../exception/GlobalExceptionHandler.java` | **Изменён** — добавлены AuthenticationException, IllegalArgumentException, IllegalStateException |
+| `booking-service/.../config/SecurityConfig.java` | **Изменён** — улучшен AccessDeniedHandler (401 vs 403) |
+
+**Этап 13 завершён.**
+
+---
+

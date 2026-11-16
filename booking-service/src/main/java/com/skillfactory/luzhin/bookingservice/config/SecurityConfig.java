@@ -143,12 +143,34 @@ public class SecurityConfig {
                         exception
                                 .authenticationEntryPoint(entryPoint)
                                 .accessDeniedHandler((request, response, accessDeniedException) -> {
-                                    response.setStatus(HttpStatus.UNAUTHORIZED.value());
-                                    response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                                    response.getWriter().write(
-                                            "{\"timestamp\":\"" + java.time.Instant.now()
-                                            + "\",\"status\":401,\"error\":\"Unauthorized\","
-                                            + "\"message\":\"Authentication required\"}");
+                                    // Проверяем, аутентифицирован ли пользователь
+                                    // Если не аутентифицирован — возвращаем 401, иначе 403
+                                    var authentication =
+                                            org.springframework.security.core.context
+                                                    .SecurityContextHolder.getContext()
+                                                    .getAuthentication();
+                                    if (authentication == null
+                                            || authentication
+                                                    instanceof
+                                                    org.springframework.security
+                                                            .authentication
+                                                            .AnonymousAuthenticationToken) {
+                                        response.setStatus(HttpStatus.UNAUTHORIZED.value());
+                                        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                                        response.getWriter().write(
+                                                "{\"timestamp\":\""
+                                                        + java.time.Instant.now()
+                                                        + "\",\"status\":401,\"error\":\"Unauthorized\","
+                                                        + "\"message\":\"Authentication required\"}");
+                                    } else {
+                                        response.setStatus(HttpStatus.FORBIDDEN.value());
+                                        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                                        response.getWriter().write(
+                                                "{\"timestamp\":\""
+                                                        + java.time.Instant.now()
+                                                        + "\",\"status\":403,\"error\":\"Forbidden\","
+                                                        + "\"message\":\"Access denied\"}");
+                                    }
                                 }))
 
                 // Добавляем JWT-фильтр перед стандартным фильтром аутентификации

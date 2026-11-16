@@ -2403,3 +2403,131 @@ REST-контроллер для CRUD-операций с бронировани
 
 ---
 
+## Этап 15: OpenAPI/Swagger документация
+
+### Дата выполнения
+16 ноября 2026
+
+### Что сделано
+
+#### 1. Создан `OpenAPIConfig` для Hotel Service
+
+**Файл:** `hotel-service/src/main/java/.../config/OpenAPIConfig.java`
+
+Конфигурация SpringDoc OpenAPI с `@Configuration`-классом:
+
+- **Метаданные API:**
+  - Название: "Hotel Management Service API"
+  - Версия: `1.0.0`
+  - Описание: REST API для управления отелями и номерами (CRUD, поиск, рекомендуемые номера)
+  - Контакт: "Skillfactory — Luzhin Sergey" (luzhin@skillfactory.com)
+  - Лицензия: Apache 2.0
+- **JWT-безопасность:** `SecurityScheme` типа HTTP, scheme `bearer`, bearerFormat `JWT`, алгоритм HS256
+- **Безопасность применяется ко всем операциям** через `addSecurityItem()`
+
+**Swagger UI:** доступен по пути `/swagger-ui.html`
+**JSON-спецификация:** доступна по пути `/v3/api-docs`
+
+#### 2. Создан `OpenAPIConfig` для Booking Service
+
+**Файл:** `booking-service/src/main/java/.../config/OpenAPIConfig.java`
+
+Аналогичная конфигурация с метаданными:
+
+- **Метаданные API:**
+  - Название: "Booking Service API"
+  - Версия: `1.0.0`
+  - Описание: REST API для управления бронированиями (регистрация, авторизация, двухшаговое бронирование, админ-управление)
+  - Контакт: "Skillfactory — Luzhin Sergey" (luzhin@skillfactory.com)
+  - Лицензия: Apache 2.0
+- **JWT-безопасность:** `SecurityScheme` типа HTTP, scheme `bearer`, bearerFormat `JWT`, описание указывает на эндпоинт `/user/auth`
+
+#### 3. Обновлён `application.yml` Hotel Service
+
+**Ключевые изменения:**
+
+Добавлен блок `springdoc`:
+```yaml
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+```
+
+#### 4. Обновлён `application.yml` Booking Service
+
+Аналогичные настройки `springdoc`:
+- Swagger UI по пути `/swagger-ui.html`
+- Сортировка операций по методу (`method`), тегов по алфавиту (`alpha`)
+- JSON-спецификация по пути `/v3/api-docs`
+
+### Проверки
+
+#### Компиляция
+
+| Проверка | Результат |
+|----------|-----------|
+| `mvn clean compile` — весь проект | ✅ BUILD SUCCESS |
+| Eureka Server | ✅ 1.118 сек |
+| API Gateway | ✅ 0.319 сек |
+| Hotel Management Service | ✅ 1.149 сек |
+| Booking Service | ✅ 0.952 сек |
+
+**Предупреждения (не критичные):**
+- `FeignConfig` — deprecated API (норма для Spring Cloud OpenFeign 13.6)
+- `FeignErrorDecoder` — unchecked operations при десериализации JSON (норма)
+
+#### Запуск Hotel Service — Swagger UI
+
+| Эндпоинт | HTTP-код | Описание |
+|----------|----------|----------|
+| `GET /swagger-ui.html` | 302 | Redirect на `/swagger-ui.html/` |
+| `GET /v3/api-docs` | 200 | JSON OpenAPI-спецификация |
+| `Init duration for springdoc-openapi` | 146 ms | Инициализация прошла успешно |
+
+#### Тесты Hotel Service
+
+| Тест | Кол-во | Результат |
+|------|--------|-----------|
+| HotelControllerTest | 10 | ✅ Все прошли |
+| RoomControllerTest | 10 | ✅ Все прошли |
+| HotelServiceTest | 6 | ✅ Все прошли |
+| RoomServiceTest | 8 | ✅ Все прошли |
+| HotelRepositoryTest | 8 | ✅ Все прошли |
+| **Итого** | **42** | ✅ **BUILD SUCCESS** |
+
+### Архитектурные решения
+
+#### Решение 1: `OpenAPIConfig` как `@Bean` метод вместо `@OpenAPIDefinition`
+
+**Причина:** `@OpenAPIDefinition` на уровне класса контроллера или пакета не всегда корректно применяется при использовании `@SpringBootApplication` с `@ComponentScan`. `@Bean` метод в `@Configuration`-классе гарантирует, что OpenAPI-конфигурация будет загружена в контекст приложения.
+
+#### Решение 2: JWT-схема безопасности в OpenAPI
+
+**Причина:** Swagger UI позволяет пользователям авторизоваться напрямую из UI через кнопку "Authorize". Для этого необходимо определить `SecurityScheme` в OpenAPI-спецификации.
+
+**Реализация:** `SecurityScheme.Type.HTTP` с `scheme: bearer` и `bearerFormat: JWT`. В описании указано, что токен можно получить через POST `/user/auth`.
+
+#### Решение 3: Gateway не требует Swagger UI
+
+**Причина:** API Gateway не имеет собственных REST-контроллеров — только маршрутизация. Swagger UI не нужен, так как документация доступна через Swagger UI каждого бэкенд-сервиса.
+
+**Альтернатива:** Для документирования маршрутов Gateway можно создать отдельный Markdown-файл или использовать OpenAPI-спецификацию Gateway (если контроллеры будут добавлены в будущем).
+
+### Файлы созданные/изменённые на этом этапе
+
+| Файл | Действие |
+|------|----------|
+| `hotel-service/.../config/OpenAPIConfig.java` | **Создан** — метаданные API + JWT-схема |
+| `booking-service/.../config/OpenAPIConfig.java` | **Создан** — метаданные API + JWT-схема |
+| `hotel-service/src/main/resources/application.yml` | **Изменён** — добавлен `springdoc` |
+| `booking-service/src/main/resources/application.yml` | **Изменён** — добавлен `springdoc` |
+
+**Этап 15 завершён.**
+
+---
+

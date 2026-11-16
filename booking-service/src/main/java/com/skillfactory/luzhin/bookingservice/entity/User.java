@@ -1,10 +1,7 @@
 package com.skillfactory.luzhin.bookingservice.entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
@@ -26,6 +23,7 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "users")
 @Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -88,8 +86,8 @@ public class User {
     /**
      * Метод-колбэк JPA, вызываемый перед обновлением записи.
      * Устанавливает дату и время последнего обновления через Hibernate.
-     * Lombok @Getter генерирует только getter, setter отсутствует,
-     * что предотвращает конфликты с JPA lifecycle callback.
+     * Lombok @Setter генерирует setter для updatedAt, но JPA @PreUpdate callback
+     * имеет приоритет и перезаписывает значение при каждом обновлении сущности.
      */
     @SuppressWarnings("unused")
     @PreUpdate

@@ -1350,3 +1350,216 @@ Started BookingServiceApplication in 4.042 seconds
 | `booking-service/.../exception/ResourceNotFoundException.java` | **Создан** — исключение 404 Not Found |
 
 ---
+
+## Исправления из code-fixes.md — завершены
+
+### Дата выполнения
+16 ноября 2026
+
+### Что сделано
+
+Все исправления из файла `code-fixes.md` были завершены:
+
+| # | Файл | Тип изменения | Статус |
+|---|------|--------------|--------|
+| 1 | `UserResponse.java` | Lombok вместо ручных методов | ✅ Завершено |
+| 2 | `BookingResponse.java` | Lombok вместо ручных методов | ✅ Завершено |
+| 3 | `BookingCreateRequest.java` | Lombok вместо ручных методов | ✅ Завершено |
+| 4 | `UserRegisterRequest.java` | Lombok вместо ручных методов | ✅ Завершено |
+| 5 | `UserLoginRequest.java` | Lombok вместо ручных методов | ✅ Завершено |
+| 6 | `UserUpdateRequest.java` | Lombok вместо ручных методов | ✅ Завершено |
+| 7 | `HotelControllerTest.java` | Удалён unused import | ✅ Завершено |
+| 8 | `RoomController.java` | Исправлена опечатка | ✅ Завершено |
+| 9 | `RoomCreateRequest.java` | `Boolean` → `boolean` | ✅ Завершено |
+| 10 | `BaseEntity.java` | Добавлены импорты | ✅ Завершено |
+| 11 | `User.java` | Lombok @Getter вместо @Data (JPA-конфликт) | ✅ Завершено |
+| 12 | `Booking.java` | Lombok @Getter вместо @Data (JPA-конфликт) | ✅ Завершено |
+
+**Итог:** Все 12 исправлений из `code-fixes.md` применены и проверены. Компиляция проходит без ошибок и предупреждений IDE.
+
+---
+
+## Этап 10: Booking Service — сервисы (AuthService, UserService, BookingService)
+
+### Дата выполнения
+16 ноября 2026
+
+### Что сделано
+
+#### 1. Добавлен `PasswordEncoder` bean в SecurityConfig
+
+**Файл:** `booking-service/.../config/SecurityConfig.java`
+
+Добавлен `@Bean PasswordEncoder` для хеширования паролей BCrypt. Необходим для AuthService при регистрации и авторизации пользователей.
+
+```java
+@Bean
+public PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder();
+}
+```
+
+Также добавлены импорты:
+- `org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder`
+- `org.springframework.security.crypto.password.PasswordEncoder`
+
+#### 2. Создан `TokenResponse` — DTO для ответа с JWT-токеном
+
+**Файл:** `booking-service/.../dto/TokenResponse.java`
+
+DTO для передачи JWT-токена вместе с данными пользователя в ответах регистрации и авторизации.
+
+**Поля:**
+- `token` — сгенерированный JWT-токен (срок действия 1 час)
+- `user` — данные пользователя (UserResponse, без пароля)
+
+**Используется в:** `AuthService.register()` и `AuthService.authenticate()`
+
+#### 3. Обновлён `ResourceNotFoundException` — добавлен конструктор с String-идентификатором
+
+**Файл:** `booking-service/.../exception/ResourceNotFoundException.java`
+
+Добавлен второй конструктор для поиска по не-ID идентификатору (например, username):
+```java
+public ResourceNotFoundException(String resourceName, String identifier)
+```
+
+#### 4. Обновлены сущности User и Booking — добавлены @Setter
+
+**Файлы:** `User.java`, `Booking.java`
+
+Добавлена аннотация `@Setter` (кроме `@Getter`) для генерации setter-методов, необходимых в сервисах для обновления полей сущностей.
+
+**User.java:**
+- `@Getter` + `@Setter` (вместо только `@Getter`)
+- Lombok-импорт: `import lombok.*;`
+- Комментарий к `onUpdate()` обновлён
+
+**Booking.java:**
+- `@Getter` + `@Setter` (вместо только `@Getter`)
+- Lombok-импорт: `import lombok.*;`
+
+#### 5. Создан `AuthService` — сервис аутентификации и авторизации
+
+**Файл:** `booking-service/.../service/AuthService.java`
+
+**Методы:**
+
+| Метод | Описание | Возвращает |
+|-------|----------|-----------|
+| `register(UserRegisterRequest)` | Регистрация нового пользователя | `TokenResponse` с JWT и данными пользователя |
+| `authenticate(UserLoginRequest)` | Авторизация пользователя | `TokenResponse` с JWT и данными пользователя |
+
+**Логика `register`:**
+1. Проверяет уникальность username через `userRepository.existsByUsername()`
+2. Создаёт сущность User через `userMapper.toEntity()`
+3. Хеширует пароль через `passwordEncoder.encode()`
+4. Устанавливает роль `USER` по умолчанию
+5. Сохраняет в БД
+6. Генерирует JWT-токен через `jwtUtil.generateToken()`
+
+**Логика `authenticate`:**
+1. Находит пользователя по username
+2. Проверяет пароль через `passwordEncoder.matches()`
+3. Генерирует JWT-токен с ролью пользователя
+
+**Исключения:**
+- `IllegalArgumentException` — при занятом username или неверном пароле
+- `ResourceNotFoundException` — при отсутствии пользователя
+
+#### 6. Создан `UserService` — административный CRUD-сервис пользователей
+
+**Файл:** `booking-service/.../service/UserService.java`
+
+**Методы:**
+
+| Метод | Описание | Доступ |
+|-------|----------|--------|
+| `createUser(UserRegisterRequest)` | Создание с ролью USER по умолчанию | ADMIN |
+| `createUser(String, String, UserRole)` | Создание с явной ролью | ADMIN |
+| `getAllUsers()` | Получение списка всех пользователей | ADMIN |
+| `getUserById(Long)` | Получение пользователя по ID | ADMIN |
+| `updateUser(Long, UserUpdateRequest)` | Обновление данных пользователя | ADMIN |
+| `deleteUser(Long)` | Удаление пользователя | ADMIN |
+
+**Особенности:**
+- Два метода `createUser` — для гибкости (с ролью по умолчанию и с явной ролью)
+- Пароль всегда хешируется через BCrypt при создании и обновлении
+- `updateUser` обновляет только переданные поля (username/password могут быть null)
+- `deleteUser` использует `existsById()` перед удалением
+
+#### 7. Создан `BookingService` — сервис бронирований (скелет)
+
+**Файл:** `booking-service/.../service/BookingService.java`
+
+**Методы:**
+
+| Метод | Описание | Возвращает |
+|-------|----------|-----------|
+| `createBooking(BookingCreateRequest, Long)` | Создание бронирования (PENDING) | `BookingResponse` |
+| `getBookingsByUserId(Long)` | История бронирований пользователя | `List<BookingResponse>` |
+| `getBookingById(Long, Long)` | Получение бронирования по ID | `BookingResponse` |
+| `cancelBooking(Long, Long)` | Отмена бронирования (CANCELLED) | void |
+
+**Логика `createBooking`:**
+1. Генерирует `correlationId` (UUID) для сквозного логирования
+2. Находит пользователя по userId
+3. Создаёт бронирование в статусе PENDING
+4. Сохраняет в БД
+5. Логирует процесс через SLF4J
+
+**Логика `getBookingById`:**
+- Проверяет, что бронирование принадлежит запрашивающему пользователю (безопасность)
+
+**Логика `cancelBooking`:**
+- Проверяет владение бронированием
+- Проверяет, что бронирование ещё не отменено (не CANCELLED)
+- Переводит в статус CANCELLED
+
+**Логируемые события (SLF4J):**
+- `Начало процесса создания бронирования`
+- `Бронирование создано в статусе PENDING`
+- `Бронирование отменено`
+
+### Проверки
+
+| Проверка | Результат |
+|----------|-----------|
+| `mvn clean compile` — booking-service | ✅ BUILD SUCCESS |
+| `mvn clean compile` — весь проект | ✅ BUILD SUCCESS |
+| Booking Service запущен на порту 8082 | ✅ Успешный запуск за 4.069 сек |
+| Actuator Health | ✅ HTTP 200, `{"status":"UP"}` |
+| Регистрация через контроллер | ⏭️ Нет контроллера (Этап 13) |
+| Авторизация через контроллер | ⏭️ Нет контроллера (Этап 13) |
+
+### Логи компиляции
+
+```
+mvn clean compile — BUILD SUCCESS
+Compiling 24 source files (3 новых сервиса + TokenResponse + изменения)
+Started BookingServiceApplication in 4.069 seconds
+```
+
+### Замечания
+- JDK в системе: **OpenJDK 25.0.1** — совместимость подтверждена
+- Eureka Client работает, сервис зарегистрировался в Eureka Server
+- Ошибки Eureka при запуске (Connection refused) — ожидаемы, Eureka Server не запущен
+- `@Slf4j` в BookingService — логирование через SLF4J для аудита и отладки
+- `@Transactional(readOnly = true)` на уровне класса — оптимизация для read-операций
+- `createBooking` пока создаёт бронирование только в статусе PENDING (без вызова Hotel Service)
+- Двухшаговое бронирование (PENDING → CONFIRMED/CANCELLED) будет реализовано в Этапе 12
+
+### Файлы созданные/изменённые на этом этапе
+
+| Файл | Действие |
+|------|----------|
+| `booking-service/.../service/AuthService.java` | **Создан** — регистрация + авторизация |
+| `booking-service/.../service/UserService.java` | **Создан** — CRUD пользователей (ADMIN) |
+| `booking-service/.../service/BookingService.java` | **Создан** — бронирования (скелет) |
+| `booking-service/.../dto/TokenResponse.java` | **Создан** — ответ с JWT-токеном |
+| `booking-service/.../config/SecurityConfig.java` | **Изменён** — добавлен PasswordEncoder bean |
+| `booking-service/.../exception/ResourceNotFoundException.java` | **Изменён** — добавлен конструктор с String |
+| `booking-service/.../entity/User.java` | **Изменён** — добавлен @Setter |
+| `booking-service/.../entity/Booking.java` | **Изменён** — добавлен @Setter |
+
+---

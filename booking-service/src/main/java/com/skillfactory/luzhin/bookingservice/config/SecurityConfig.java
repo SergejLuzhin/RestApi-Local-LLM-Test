@@ -10,6 +10,8 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -51,6 +53,18 @@ public class SecurityConfig {
      * для перехвата и обработки Bearer-токенов.
      */
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    /**
+     * Создает кодировщик паролей BCrypt.
+     * Используется для хеширования паролей при регистрации пользователей
+     * и проверки паролей при авторизации.
+     *
+     * @return экземпляр BCryptPasswordEncoder
+     */
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
 
     /**
      * Точка входа для обработки ошибок аутентификации.

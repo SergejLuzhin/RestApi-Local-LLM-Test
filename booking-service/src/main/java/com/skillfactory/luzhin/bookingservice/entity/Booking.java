@@ -1,10 +1,7 @@
 package com.skillfactory.luzhin.bookingservice.entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
@@ -35,6 +32,7 @@ import java.time.LocalDateTime;
            @Index(name = "idx_booking_room_id_start_end", columnList = "room_id, start_date, end_date")
        })
 @Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor

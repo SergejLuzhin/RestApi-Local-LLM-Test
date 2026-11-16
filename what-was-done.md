@@ -993,5 +993,67 @@ verify(hotelRepository, never()).delete(any(Hotel.class));
 |------|----------|
 | `hotel-service/.../service/HotelServiceTest.java` | **Создан** — 6 unit-тестов сервиса |
 
-### Следующий этап
-**Этап 7.5: `HotelRepositoryTest` — `@DataJpaTest` (репозитории)**
+---
+
+## Этап 7.5: HotelRepositoryTest — `@DataJpaTest` (репозитории)
+
+### Дата выполнения
+16 ноября 2026
+
+### Что сделано
+
+#### 1. Создан тестовый класс `HotelRepositoryTest`
+
+**Файл:** `hotel-service/src/test/java/.../repository/HotelRepositoryTest.java`
+
+8 тестов (`H-REPO-1` до `H-REPO-8`) по плану Этапа 7:
+
+| # | Тест | Репозиторий | Что проверяет | Ожидаемый результат |
+|---|------|-------------|---------------|---------------------|
+| H-REPO-1 | Сортировка по timesBooked | `RoomRepository` | `findByAvailableTrueOrderByTimesBookedAscIdAsc()` | timesBooked=0, id=1 < timesBooked=0, id=2 < timesBooked=1 |
+| H-REPO-2 | Пересечение — есть | `BookingRepository` | `findOverlappingBookings(10-12, 11-13)` | 1 пересечение |
+| H-REPO-3 | Пересечение — нет (после) | `BookingRepository` | `findOverlappingBookings(10-12, 13-15)` | 0 пересечений |
+| H-REPO-4 | Пересечение — нет (до) | `BookingRepository` | `findOverlappingBookings(10-12, 08-09)` | 0 пересечений |
+| H-REPO-5 | Поиск по имени | `HotelRepository` | `findByName("Grand Hotel")` | 1 отель |
+| H-REPO-6 | Поиск по подстроке | `HotelRepository` | `findByNameContainingIgnoreCase("grand")` | 1 отель |
+| H-REPO-7 | Загрузка с номерами | `HotelRepository` | `findByIdWithRooms()` + `entityManager.clear()` | rooms.size() == 2 |
+| H-REPO-8 | Удаление temp-бронирований | `BookingRepository` | `deleteTemporaryBookings(userId=0)` | Удалено 1, осталось 1 реальное |
+
+**Результат:** `Tests run: 8, Failures: 0, Errors: 0, BUILD SUCCESS`
+
+### Подводные камни и решения
+
+#### Проблема 1: `EntityExistsException: detached entity passed to persist`
+
+**Причина:** Явная установка `id` в builder'ах (`.id(1L)`) + `TestEntityManager.persist()`. Hibernate видит entity с установленным ID как detached и отказывается persist.
+
+**Решение:** Не задавать ID явно в builder'ах — Hibernate генерирует их автоматически. Получать ID из сохранённых объектов после `flush()`.
+
+#### Проблема 2: `rooms.size() == 0` вместо 2 при `findByIdWithRooms`
+
+**Причина:** Stale entity в persistence context. `entityManager.persist()` кэширует hotel в dirty state с пустым `rooms`. Запрос `findByIdWithRooms` возвращает entity из кэша, а не из БД.
+
+**Решение:** Вызвать `entityManager.clear()` перед запросом — очистка persistence context заставляет Hibernate выполнить запрос к БД заново.
+
+### Проверки
+
+| Проверка | Результат |
+|----------|-----------|
+| `mvn test -Dtest=HotelRepositoryTest` | ✅ BUILD SUCCESS |
+| 8 тестов прошли | ✅ 8/8 |
+| Сортировка `timesBooked ASC, id ASC` | ✅ |
+| Пересечение дат (есть) | ✅ 1 результат |
+| Пересечение дат (после) | ✅ пусто |
+| Пересечение дат (до) | ✅ пусто |
+| Поиск по точному имени | ✅ `Optional` present |
+| Поиск по подстроке (case-insensitive) | ✅ 1 результат |
+| JOIN FETCH с номерами | ✅ 2 номера |
+| `deleteTemporaryBookings` (userId=0) | ✅ 1 удалено, 1 осталось |
+
+### Файлы созданные/изменённые на этом этапе
+
+| Файл | Действие |
+|------|----------|
+| `hotel-service/.../repository/HotelRepositoryTest.java` | **Создан** — 8 `@DataJpaTest` тестов |
+
+**Этап 7 завершён полностью. Все 44 теста Hotel Service написаны и проходят.**

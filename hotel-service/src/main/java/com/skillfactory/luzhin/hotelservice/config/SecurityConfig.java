@@ -106,17 +106,17 @@ public class SecurityConfig {
                         ).permitAll()
 
                         // Публичный доступ к GET-эндпоинтам для поиска отелей и номеров
-                        .requestMatchers("/api/hotels").permitAll()
-                        .requestMatchers("/api/hotels/**").permitAll()
-                        .requestMatchers("/api/rooms").permitAll()
-                        .requestMatchers("/api/rooms/recommend").permitAll()
+                        .requestMatchers("/hotels").permitAll()
+                        .requestMatchers("/hotels/**").permitAll()
+                        .requestMatchers("/rooms").permitAll()
+                        .requestMatchers("/rooms/recommend").permitAll()
 
                         // Внутренние эндпоинты подтверждения доступности и снятия блокировки
-                        .requestMatchers("/api/rooms/{roomId}/confirm-availability").permitAll()
-                        .requestMatchers("/api/rooms/{roomId}/release").permitAll()
+                        .requestMatchers("/rooms/{roomId}/confirm-availability").permitAll()
+                        .requestMatchers("/rooms/{roomId}/release").permitAll()
 
                         // Все остальные запросы к API требуют аутентификации
-                        .requestMatchers("/api/**").authenticated()
+                        .requestMatchers("/**").authenticated()
 
                         // Остальные запросы требуют аутентификации
                         .anyRequest().authenticated()

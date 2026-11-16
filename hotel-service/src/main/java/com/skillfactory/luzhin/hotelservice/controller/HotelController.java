@@ -21,7 +21,7 @@ import java.util.List;
  * Предоставляет эндпоинты CRUD: создание, получение списка, получение по ID, обновление, удаление.
  */
 @RestController
-@RequestMapping("/api/hotels")
+@RequestMapping("/hotels")
 @RequiredArgsConstructor
 @Tag(name = "Hotel Controller", description = "API для управления отелями")
 public class HotelController {

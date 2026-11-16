@@ -108,7 +108,7 @@ class HotelControllerTest {
 
     /**
      * Проверяет успешное создание отеля с ролью ADMIN.
-     * Запрос: POST /api/hotels с валидными данными.
+     * Запрос: POST /hotels с валидными данными.
      * Ожидаемый результат: HTTP 201 Created с DTO созданного отеля.
      *
      * @throws Exception ошибка при выполнении запроса
@@ -125,7 +125,7 @@ class HotelControllerTest {
 
         when(hotelService.createHotel(any())).thenReturn(response);
 
-        mockMvc.perform(post("/api/hotels")
+        mockMvc.perform(post("/hotels")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"Grand Hotel\",\"address\":\"123 Main St, New York\"}")
                         .header("Authorization", "Bearer " + generateToken("admin", "ADMIN")))
@@ -139,14 +139,14 @@ class HotelControllerTest {
 
     /**
      * Проверяет валидацию входных данных при создании отеля.
-     * Запрос: POST /api/hotels с пустым телом.
+     * Запрос: POST /hotels с пустым телом.
      * Ожидаемый результат: HTTP 400 Bad Request с ошибками валидации.
      *
      * @throws Exception ошибка при выполнении запроса
      */
     @Test
     void shouldRejectEmptyBodyOnCreateHotel() throws Exception {
-        mockMvc.perform(post("/api/hotels")
+        mockMvc.perform(post("/hotels")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}")
                         .header("Authorization", "Bearer " + generateToken("admin", "ADMIN")))
@@ -165,7 +165,7 @@ class HotelControllerTest {
      */
     @Test
     void shouldRejectHotelCreationWithoutToken() throws Exception {
-        mockMvc.perform(post("/api/hotels")
+        mockMvc.perform(post("/hotels")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"Grand Hotel\",\"address\":\"123 Main St\"}"))
                 .andExpect(status().isUnauthorized());
@@ -180,7 +180,7 @@ class HotelControllerTest {
      */
     @Test
     void shouldRejectHotelCreationWithUserRole() throws Exception {
-        mockMvc.perform(post("/api/hotels")
+        mockMvc.perform(post("/hotels")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"Grand Hotel\",\"address\":\"123 Main St\"}")
                         .header("Authorization", "Bearer " + generateToken("user", "USER")))
@@ -198,7 +198,7 @@ class HotelControllerTest {
     void shouldGetHotelsListWithoutToken() throws Exception {
         when(hotelService.getAllHotels()).thenReturn(List.of());
 
-        mockMvc.perform(get("/api/hotels"))
+        mockMvc.perform(get("/hotels"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
     }
@@ -222,7 +222,7 @@ class HotelControllerTest {
 
         when(hotelService.getHotelById(1L)).thenReturn(response);
 
-        mockMvc.perform(get("/api/hotels/1")
+        mockMvc.perform(get("/hotels/1")
                         .header("Authorization", "Bearer " + generateToken("user", "USER")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
@@ -243,7 +243,7 @@ class HotelControllerTest {
         when(hotelService.getHotelById(999L))
                 .thenThrow(new com.skillfactory.luzhin.hotelservice.exception.ResourceNotFoundException("Hotel", 999L));
 
-        mockMvc.perform(get("/api/hotels/999")
+        mockMvc.perform(get("/hotels/999")
                         .header("Authorization", "Bearer " + generateToken("user", "USER")))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
@@ -269,7 +269,7 @@ class HotelControllerTest {
 
         when(hotelService.updateHotel(org.mockito.ArgumentMatchers.eq(1L), any())).thenReturn(response);
 
-        mockMvc.perform(patch("/api/hotels/1")
+        mockMvc.perform(patch("/hotels/1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"Updated Hotel Name\",\"address\":\"456 New Address\"}")
                         .header("Authorization", "Bearer " + generateToken("admin", "ADMIN")))
@@ -289,7 +289,7 @@ class HotelControllerTest {
     void shouldDeleteHotelWithAdminRole() throws Exception {
         doNothing().when(hotelService).deleteHotel(1L);
 
-        mockMvc.perform(delete("/api/hotels/1")
+        mockMvc.perform(delete("/hotels/1")
                         .header("Authorization", "Bearer " + generateToken("admin", "ADMIN")))
                 .andExpect(status().isNoContent());
     }
@@ -306,7 +306,7 @@ class HotelControllerTest {
         doThrow(new com.skillfactory.luzhin.hotelservice.exception.ResourceNotFoundException("Hotel", 999L))
                 .when(hotelService).deleteHotel(999L);
 
-        mockMvc.perform(delete("/api/hotels/999")
+        mockMvc.perform(delete("/hotels/999")
                         .header("Authorization", "Bearer " + generateToken("admin", "ADMIN")))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404));

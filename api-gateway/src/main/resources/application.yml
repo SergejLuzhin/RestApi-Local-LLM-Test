@@ -5,26 +5,45 @@ spring:
   application:
     name: api-gateway
 
-spring.cloud:
-  gateway:
-    discovery:
-      locator:
-        enabled: true
-        lower-case-service-id: true
-    routes:
-      - id: booking-service
-        uri: lb://booking-service
-        predicates:
-          - Path=/api/bookings/**
-        filters:
-          - StripPrefix=1
+  cloud:
+    gateway:
+      # Discovery locator отключён — маршруты определены вручную для полного контроля
+      discovery:
+        locator:
+          enabled: false
+      routes:
+        # Маршрутизация запросов к аутентификации и управлению пользователями (Booking Service)
+        # /api/user/** → Booking Service
+        # RewritePath преобразует: /api/(?<segment>.+) → /${segment}
+        # Пример: /api/user/register → /user/register, /api/user → /user
+        - id: booking-auth-service
+          uri: lb://booking-service
+          predicates:
+            - Path=/api/user/**
+          filters:
+            - RewritePath=/api/(?<segment>.*), /${segment}
 
-      - id: hotel-service
-        uri: lb://hotel-service
-        predicates:
-          - Path=/api/hotels/**
-        filters:
-          - StripPrefix=1
+        # Маршрутизация запросов к Booking Service (бронирования)
+        # /api/bookings/** → Booking Service
+        # RewritePath преобразует: /api/(?<segment>.+) → /${segment}
+        # Пример: /api/bookings → /bookings, /api/booking/1 → /booking/1
+        - id: booking-service
+          uri: lb://booking-service
+          predicates:
+            - Path=/api/bookings/**
+          filters:
+            - RewritePath=/api/(?<segment>.*), /${segment}
+
+        # Маршрутизация запросов к Hotel Management Service
+        # /api/hotels/** → Hotel Service
+        # RewritePath преобразует: /api/(?<segment>.+) → /${segment}
+        # Пример: /api/hotels → /hotels, /api/rooms → /rooms
+        - id: hotel-service
+          uri: lb://hotel-service
+          predicates:
+            - Path=/api/hotels/**
+          filters:
+            - RewritePath=/api/(?<segment>.*), /${segment}
 
 eureka:
   client:

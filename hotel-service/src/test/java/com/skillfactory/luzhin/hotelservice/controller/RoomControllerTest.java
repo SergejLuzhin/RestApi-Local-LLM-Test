@@ -108,7 +108,7 @@ class RoomControllerTest {
 
     /**
      * Проверяет успешное создание номера с ролью ADMIN и валидным hotelId.
-     * Запрос: POST /api/rooms с валидными данными.
+     * Запрос: POST /rooms с валидными данными.
      * Ожидаемый результат: HTTP 201 Created с DTO созданного номера.
      *
      * @throws Exception ошибка при выполнении запроса
@@ -126,7 +126,7 @@ class RoomControllerTest {
 
         when(roomService.createRoom(any(RoomCreateRequest.class))).thenReturn(response);
 
-        mockMvc.perform(post("/api/rooms")
+        mockMvc.perform(post("/rooms")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"hotelId\":1,\"number\":\"101\",\"available\":true}")
                         .header("Authorization", "Bearer " + generateToken("admin", "ADMIN")))
@@ -143,13 +143,13 @@ class RoomControllerTest {
 
     /**
      * Проверяет, что создание номера без JWT-токена возвращает 401 Unauthorized.
-     * Эндпоинт POST /api/rooms защищён @PreAuthorize("hasRole('ADMIN')").
+     * Эндпоинт POST /rooms защищён @PreAuthorize("hasRole('ADMIN')").
      *
      * @throws Exception ошибка при выполнении запроса
      */
     @Test
     void shouldRejectRoomCreationWithoutToken() throws Exception {
-        mockMvc.perform(post("/api/rooms")
+        mockMvc.perform(post("/rooms")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"hotelId\":1,\"number\":\"101\"}"))
                 .andExpect(status().isUnauthorized());
@@ -159,7 +159,7 @@ class RoomControllerTest {
 
     /**
      * Проверяет, что создание номера с несуществующим hotelId возвращает 404 Not Found.
-     * Запрос: POST /api/rooms с hotelId=999, который не существует.
+     * Запрос: POST /rooms с hotelId=999, который не существует.
      * Ожидаемый результат: HTTP 404 Not Found.
      *
      * @throws Exception ошибка при выполнении запроса
@@ -169,7 +169,7 @@ class RoomControllerTest {
         doThrow(new com.skillfactory.luzhin.hotelservice.exception.ResourceNotFoundException("Hotel", 999L))
                 .when(roomService).createRoom(any(RoomCreateRequest.class));
 
-        mockMvc.perform(post("/api/rooms")
+        mockMvc.perform(post("/rooms")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"hotelId\":999,\"number\":\"202\"}")
                         .header("Authorization", "Bearer " + generateToken("admin", "ADMIN")))
@@ -182,14 +182,14 @@ class RoomControllerTest {
 
     /**
      * Проверяет валидацию входных данных при создании номера.
-     * Запрос: POST /api/rooms с отсутствующим hotelId (null).
+     * Запрос: POST /rooms с отсутствующим hotelId (null).
      * Ожидаемый результат: HTTP 400 Bad Request с ошибкой валидации по полю hotelId.
      *
      * @throws Exception ошибка при выполнении запроса
      */
     @Test
     void shouldRejectRoomCreationWithoutHotelId() throws Exception {
-        mockMvc.perform(post("/api/rooms")
+        mockMvc.perform(post("/rooms")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"number\":\"101\"}")
                         .header("Authorization", "Bearer " + generateToken("admin", "ADMIN")))
@@ -202,7 +202,7 @@ class RoomControllerTest {
 
     /**
      * Проверяет получение списка доступных номеров без токена (публичный эндпоинт).
-     * Эндпоинт GET /api/rooms доступен без аутентификации согласно SecurityConfig.
+     * Эндпоинт GET /rooms доступен без аутентификации согласно SecurityConfig.
      *
      * @throws Exception ошибка при выполнении запроса
      */
@@ -227,7 +227,7 @@ class RoomControllerTest {
 
         when(roomService.getAllAvailableRooms()).thenReturn(List.of(room1, room2));
 
-        mockMvc.perform(get("/api/rooms"))
+        mockMvc.perform(get("/rooms"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].number").value("101"))
@@ -263,7 +263,7 @@ class RoomControllerTest {
 
         when(roomService.getRecommendedRooms()).thenReturn(List.of(room1, room2));
 
-        mockMvc.perform(get("/api/rooms/recommend"))
+        mockMvc.perform(get("/rooms/recommend"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
                 // Первый номер с меньшим timesBooked
@@ -287,7 +287,7 @@ class RoomControllerTest {
 
         doNothing().when(roomService).confirmAvailability(eq(1L), eq(start), eq(end), anyString());
 
-        mockMvc.perform(post("/api/rooms/1/confirm-availability")
+        mockMvc.perform(post("/rooms/1/confirm-availability")
                         .param("start", start.toString())
                         .param("end", end.toString())
                         .param("correlationId", "test-correlation-001")
@@ -312,7 +312,7 @@ class RoomControllerTest {
                         1L, "Room is already booked for the specified dates"))
                 .when(roomService).confirmAvailability(eq(1L), eq(start), eq(end), anyString());
 
-        mockMvc.perform(post("/api/rooms/1/confirm-availability")
+        mockMvc.perform(post("/rooms/1/confirm-availability")
                         .param("start", start.toString())
                         .param("end", end.toString())
                         .param("correlationId", "test-correlation-002")
@@ -337,7 +337,7 @@ class RoomControllerTest {
 
         doNothing().when(roomService).releaseSlot(eq(1L), eq(start), eq(end), anyString());
 
-        mockMvc.perform(post("/api/rooms/1/release")
+        mockMvc.perform(post("/rooms/1/release")
                         .param("start", start.toString())
                         .param("end", end.toString())
                         .param("correlationId", "test-correlation-003")
@@ -362,7 +362,7 @@ class RoomControllerTest {
         // releaseSlot не выбрасывает исключение при отсутствии блокировки
         doNothing().when(roomService).releaseSlot(eq(1L), eq(start), eq(end), anyString());
 
-        mockMvc.perform(post("/api/rooms/1/release")
+        mockMvc.perform(post("/rooms/1/release")
                         .param("start", start.toString())
                         .param("end", end.toString())
                         .param("correlationId", "test-correlation-004")

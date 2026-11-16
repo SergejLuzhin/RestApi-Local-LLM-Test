@@ -24,7 +24,7 @@ import java.util.List;
  * и снятия временной блокировки (для двухшаговой транзакции с Booking Service).
  */
 @RestController
-@RequestMapping("/api/rooms")
+@RequestMapping("/rooms")
 @RequiredArgsConstructor
 @Tag(name = "Room Controller", description = "API для управления номерами отелей")
 public class RoomController {

@@ -365,9 +365,15 @@ public class BookingService {
                 bookingId, correlationId);
 
         // Если бронирование было в статусе PENDING — компенсируем блокировку в Hotel Service
-        // (перевод из CONFIRMED вручную не требует компенсации — номер занят)
-        // Но если бронирование было PENDING и мы его отменяем — нужно освободить слот
-        // (PENDING бронирования без подтверждения Hotel Service не создают блокировку,
-        //  так как confirmWithRetry не дошёл до сохранения CONFIRMED)
+        if (booking.getRoomId() != null) {
+            log.info("Компенсация: освобождаем слот для номера. bookingId={}, roomId={}",
+                    bookingId, booking.getRoomId());
+            hotelServiceClient.releaseSlot(
+                    booking.getRoomId(),
+                    booking.getStartDate(),
+                    booking.getEndDate(),
+                    correlationId
+            );
+        }
     }
 }

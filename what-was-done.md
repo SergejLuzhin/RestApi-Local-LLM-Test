@@ -2531,3 +2531,137 @@ springdoc:
 
 ---
 
+## Этап 16: Интеграционные тесты Booking Service
+
+### Дата выполнения
+16 ноября 2026
+
+### Что сделано
+
+#### 1. AuthControllerTest — 7 тестов
+
+**Файл:** `booking-service/src/test/java/.../controller/AuthControllerTest.java`
+
+Тесты контроллера регистрации и авторизации (`POST /user/register`, `POST /user/auth`):
+
+| Тест | Описание |
+|------|----------|
+| `shouldRegisterUserSuccessfully` | Успешная регистрация → 200 с JWT-токеном |
+| `shouldAuthenticateUserSuccessfully` | Успешная авторизация → 200 с JWT-токеном |
+| `shouldAllowRegistrationWithoutToken` | Регистрация доступна публично (permitAll) → 200 |
+| `shouldAllowAuthenticationWithoutToken` | Авторизация доступна публично (permitAll) → 200 |
+| `shouldRejectEmptyBodyOnRegistration` | Пустой запрос → 400 с ошибками валидации |
+| `shouldRejectDuplicateUsername` | Занятое имя → 400 |
+| `shouldRejectWrongPassword` | Неверный пароль → 400 |
+
+**Особенность:** Эндпоинты `/user/register` и `/user/auth` настроены как `permitAll()` — они публичные и не требуют JWT-токена.
+
+#### 2. BookingControllerTest — 8 тестов
+
+**Файл:** `booking-service/src/test/java/.../controller/BookingControllerTest.java`
+
+Тесты контроллера бронирований (`POST /booking`, `GET /booking/{id}`, `GET /booking/bookings`, `DELETE /booking/{id}`):
+
+| Тест | Описание |
+|------|----------|
+| `shouldCreateBookingWithExplicitRoomId` | Создание с roomId → 201 |
+| `shouldCreateBookingWithAutoSelect` | Создание с autoSelect=true → 201 |
+| `shouldGetBookingById` | Получение по ID → 200 |
+| `shouldGetBookingHistory` | История бронирований → 200 |
+| `shouldCancelBooking` | Отмена бронирования → 204 |
+| `shouldReturnNotFoundForMissingBooking` | Бронирование не найдено → 404 |
+| `shouldRejectAccessWithoutToken` | Доступ без токена → 401 |
+| `shouldRejectBookingCreationWithoutToken` | Создание без токена → 401 |
+
+**Особенность:** Используется `@MockBean` для `BookingService` и `AuthService` — все вызовы бизнес-логики мокнуты.
+
+#### 3. BookingServiceTest — 6 тестов
+
+**Файл:** `booking-service/src/test/java/.../service/BookingServiceTest.java`
+
+Тесты сервиса бронирований (unit-тесты с `@ExtendWith(MockitoExtension.class)`):
+
+| Тест | Описание |
+|------|----------|
+| `shouldCreateBookingWithConfirmation` | DTA: PENDING → Hotel Service подтверждает → CONFIRMED |
+| `shouldCancelBookingOnHotelServiceFailure` | DTA: PENDING → Hotel Service ошибка → CANCELLED + releaseSlot |
+| `shouldCancelBooking` | Ручная отмена: CONFIRMED → CANCELLED |
+| `shouldThrowOnCancelAlreadyCancelledBooking` | Повторная отмена → IllegalStateException |
+| `shouldGetBookingById` | Получение бронирования по ID |
+| `shouldGetBookingsByUserId` | Получение истории бронирований |
+
+**Особенность:** Исправлен баг в production-коде — `cancelBookingInternal` теперь вызывает `hotelServiceClient.releaseSlot()` для компенсации блокировки номера при отмене PENDING-бронирования.
+
+#### 4. HotelServiceClientTest — 4 теста
+
+**Файл:** `booking-service/src/test/java/.../client/HotelServiceClientTest.java`
+
+Тесты Feign-клиента:
+
+| Тест | Описание |
+|------|----------|
+| `shouldInitializeFeignClient` | Клиент корректно инициализируется OpenFeign |
+| `shouldConfirmAvailabilityWithMock` | Мокированный confirmAvailability → 200 |
+| `shouldReleaseSlotWithMock` | Мокированный releaseSlot → 200 |
+| `shouldGetRecommendedRoomsWithMock` | Мокированный getRecommendedRooms → 200 |
+
+#### 5. Исправление production-кода
+
+**Файл:** `booking-service/.../service/BookingService.java`
+
+В методе `cancelBookingInternal` добавлен вызов `hotelServiceClient.releaseSlot()` для компенсации блокировки номера при отмене PENDING-бронирования. Ранее этот вызов отсутствовал, что противоречило документации метода.
+
+### Проверки
+
+#### Компиляция и тесты
+
+| Проверка | Результат |
+|----------|-----------|
+| `mvn clean test` — весь проект | ✅ BUILD SUCCESS |
+| Eureka Server | ✅ 1.366 сек |
+| API Gateway | ✅ 0.354 сек |
+| Hotel Management Service | ✅ 7.877 сек (42 теста) |
+| Booking Service | ✅ 16.201 сек (25 тестов) |
+| **Итого** | **67 тестов** | ✅ **BUILD SUCCESS** |
+
+### Архитектурные решения
+
+#### Решение 1: `@SpringBootTest(webEnvironment = MOCK)` для контроллеров
+
+**Причина:** Booking Service имеет `@Component` зависимости (`JwtUtil`, `JwtAuthenticationFilter`), которые невозможно замокать через `@WebMvcTest`. `webEnvironment = MOCK` загружает полный Spring-контекст с `MockMvc`, но без встроенного сервера.
+
+**Реализация:** `MockMvcBuilders.webAppContextSetup(wac).apply(springSecurity()).build()` — ручной запуск MockMvc с применённым Spring Security.
+
+#### Решение 2: JWT через `@Value("${jwt.secret}")`
+
+**Причина:** `@TestPropertySource` устанавливает свойство в Spring-контекст, а не в JVM system properties. `System.getProperty("jwt.secret")` возвращает null.
+
+**Реализация:** Использование `@Value("${jwt.secret}")` для инъекции секрета из тестовой конфигурации.
+
+#### Решение 3: Мокирование Feign-клиента через `@MockBean`
+
+**Причина:** Для тестов контроллеров и сервисов не требуется реальный вызов Hotel Service. Mock-клиент позволяет изолировать тесты от внешних зависимостей.
+
+**Реализация:** `@MockBean private HotelServiceClient mockHotelServiceClient;` — Spring автоматически заменяет бэн Feign-клиента на Mockito-моck.
+
+#### Решение 4: Исправление compensation-логики
+
+**Причина:** `cancelBookingInternal` должен был вызывать `releaseSlot` для освобождения слота номера при отмене PENDING-бронирования, но этот вызов отсутствовал.
+
+**Реализация:** Добавлен вызов `hotelServiceClient.releaseSlot()` после перевода бронирования в CANCELLED, с проверкой `roomId != null`.
+
+### Файлы созданные/изменённые на этом этапе
+
+| Файл | Действие |
+|------|----------|
+| `booking-service/.../controller/AuthControllerTest.java` | **Создан** — 7 тестов |
+| `booking-service/.../controller/BookingControllerTest.java` | **Создан** — 8 тестов |
+| `booking-service/.../service/BookingServiceTest.java` | **Создан** — 6 тестов |
+| `booking-service/.../client/HotelServiceClientTest.java` | **Создан** — 4 теста |
+| `booking-service/.../service/BookingService.java` | **Изменён** — добавлен releaseSlot |
+| `booking-service/pom.xml` | **Изменён** — добавлен spring-security-test |
+
+**Этап 16 завершён.**
+
+---
+

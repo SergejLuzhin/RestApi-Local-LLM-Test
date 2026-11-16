@@ -1,6 +1,7 @@
 package com.skillfactory.luzhin.bookingservice.dto;
 
 import jakarta.validation.constraints.Size;
+import lombok.*;
 
 /**
  * DTO (Transfer Object) для запроса на обновление данных пользователя.
@@ -12,55 +13,17 @@ import jakarta.validation.constraints.Size;
  * - username — новое имя пользователя (опционально, 3-50 символов);
  * - password — новый пароль (опционально, минимум 6 символов).
  */
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class UserUpdateRequest {
 
-    /**
-     * Новое имя пользователя (опциональное).
-     * Должно содержать от 3 до 50 символов, если передано.
-     */
+    /** Новое имя пользователя (опционально). От 3 до 50 символов, если передано. */
     @Size(min = 3, max = 50, message = "Имя пользователя должно содержать от 3 до 50 символов")
     private String username;
 
-    /**
-     * Новый пароль (опциональный).
-     * Должен содержать минимум 6 символов, если передан.
-     */
+    /** Новый пароль (опционально). Минимум 6 символов, если передан. */
     @Size(min = 6, message = "Пароль должен содержать минимум 6 символов")
     private String password;
-
-    /**
-     * Возвращает новое имя пользователя.
-     *
-     * @return имя пользователя
-     */
-    public String getUsername() {
-        return username;
-    }
-
-    /**
-     * Устанавливает новое имя пользователя.
-     *
-     * @param username имя пользователя
-     */
-    public void setUsername(String username) {
-        this.username = username;
-    }
-
-    /**
-     * Возвращает новый пароль.
-     *
-     * @return пароль
-     */
-    public String getPassword() {
-        return password;
-    }
-
-    /**
-     * Устанавливает новый пароль.
-     *
-     * @param password пароль
-     */
-    public void setPassword(String password) {
-        this.password = password;
-    }
 }

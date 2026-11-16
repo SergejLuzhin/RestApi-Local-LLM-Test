@@ -930,5 +930,68 @@ verify(bookingRepository, never()).save(any(Booking.class));
 |------|----------|
 | `hotel-service/.../service/RoomServiceTest.java` | **Создан** — 8 unit-тестов сервиса |
 
+---
+
+## Этап 7.4: HotelServiceTest — unit-тесты сервиса отелей
+
+### Дата выполнения
+16 ноября 2026
+
+### Что сделано
+
+#### 1. Создан тестовый класс `HotelServiceTest`
+
+**Файл:** `hotel-service/src/test/java/.../service/HotelServiceTest.java`
+
+6 тестов (`H-HS-1` до `H-HS-6`) по плану Этапа 7:
+
+| # | Тест | Метод | Что проверяет | Ожидаемый результат |
+|---|------|-------|---------------|---------------------|
+| H-HS-1 | Создание отеля | `createHotel()` | `HotelRepository.save()` | `HotelResponse` с id |
+| H-HS-2 | Получение всех отелей | `getAllHotels()` | `HotelRepository.findAllWithRooms()` | Список `HotelResponse` с агрегацией |
+| H-HS-3 | Обновление отеля | `updateHotel(id, request)` | Отель найден, поля обновлены | `HotelResponse` с новыми значениями |
+| H-HS-4 | Обновление несуществующего | `updateHotel(999, request)` | `findByIdWithRooms(999)` = empty | `ResourceNotFoundException` |
+| H-HS-5 | Удаление отеля | `deleteHotel(id)` | `HotelRepository.delete()` | Без исключения |
+| H-HS-6 | Удаление несуществующего | `deleteHotel(999)` | Отель не найден | `ResourceNotFoundException` |
+
+**Результат:** `Tests run: 6, Failures: 0, Errors: 0, BUILD SUCCESS`
+
+### Особенности реализации
+
+#### Тестирование всех CRUD-методов сервиса
+
+В отличие от `HotelControllerTest` (который мокнул контроллер), `HotelServiceTest` тестирует бизнес-логику напрямую:
+- `createHotel` — маппинг request → entity, сохранение, маппинг entity → response
+- `getAllHotels` — загрузка с JOIN FETCH номеров, маппинг списка
+- `updateHotel` — поиск, обновление полей, сохранение
+- `deleteHotel` — поиск, каскадное удаление
+
+#### Верификация never() вызовов
+
+Для ошибок обновления/удаления несуществующего отеля проверяется, что `save()` и `delete()` **не вызывались**:
+```java
+verify(hotelRepository, never()).save(any(Hotel.class));
+verify(hotelRepository, never()).delete(any(Hotel.class));
+```
+
+### Проверки
+
+| Проверка | Результат |
+|----------|-----------|
+| `mvn test -Dtest=HotelServiceTest` | ✅ BUILD SUCCESS |
+| 6 тестов прошли | ✅ 6/6 |
+| Создание отеля | ✅ save вызван |
+| Получение списка | ✅ findAllWithRooms |
+| Обновление (успех) | ✅ поля обновлены |
+| Обновление (не найден) | ✅ ResourceNotFoundException |
+| Удаление (успех) | ✅ delete вызван |
+| Удаление (не найден) | ✅ ResourceNotFoundException |
+
+### Файлы созданные/изменённые на этом этапе
+
+| Файл | Действие |
+|------|----------|
+| `hotel-service/.../service/HotelServiceTest.java` | **Создан** — 6 unit-тестов сервиса |
+
 ### Следующий этап
-**Этап 7.4: `HotelServiceTest` — unit-тесты сервиса отелей**
+**Этап 7.5: `HotelRepositoryTest` — `@DataJpaTest` (репозитории)**

@@ -1228,3 +1228,125 @@ Started BookingServiceApplication in 3.581 seconds
 | `booking-service/.../mapper/BookingMapper.java` | **Создан** — MapStruct-маппер Booking |
 
 ---
+
+---
+
+## Этап 9: Booking Service — JWT и безопасность
+
+### Дата выполнения
+16 ноября 2026
+
+### Что сделано
+
+#### 1. Создан `JwtUtil` — утилита для работы с JWT-токенами
+
+**Файл:** `booking-service/.../config/JwtUtil.java`
+
+Утилита для генерации, парсинга, валидации и извлечения данных из JWT-токенов. Использует алгоритм **HS256** (HMAC with SHA-256).
+
+**Основные методы:**
+- `generateToken(String username, String role)` — генерация нового JWT-токена с указанием роли;
+- `getUsername(String token)` — извлечение имени пользователя из claims (`sub`);
+- `getRole(String token)` — извлечение роли из claims (`role`), формат `ROLE_USER` или `ROLE_ADMIN`;
+- `getExpirationDate(String token)` — извлечение даты истечения;
+- `isTokenExpired(String token)` — проверка, истёк ли токен;
+- `isTokenValid(String token)` — полная валидация (подпись, срок, наличие пользователя).
+
+**Конфигурация:**
+- Секрет JWT загружается из `jwt.secret` (переменная окружения `JWT_SECRET`);
+- TTL токена — из `jwt.expiration-ms` (по умолчанию 3600000 мс = 1 час).
+
+#### 2. Создан `JwtAuthenticationFilter` — фильтр аутентификации JWT
+
+**Файл:** `booking-service/.../config/JwtAuthenticationFilter.java`
+
+Наследуется от `OncePerRequestFilter` — гарантируется однократное выполнение на каждый HTTP-запрос.
+
+**Логика работы:**
+1. Извлекает заголовок `Authorization`;
+2. Проверяет наличие префикса `Bearer `;
+3. Если заголовок отсутствует — запрос продолжает обработку (для публичных эндпоинтов);
+4. Валидирует токен через `JwtUtil.isTokenValid()`;
+5. При невалидном токене — возвращает HTTP 401;
+6. При валидном токене — извлекает `username` и `role`, создаёт `UsernamePasswordAuthenticationToken` с `SimpleGrantedAuthority(role)` и устанавливает в `SecurityContextHolder`;
+7. **Пропускает без аутентификации:** `/swagger-ui/**`, `/v3/api-docs/**`, `/swagger-resources/**`, `/swagger-ui.html`, `/actuator/health`, `/h2-console`.
+
+#### 3. Создан `SecurityConfig` — JWT-безопасность + `@EnableMethodSecurity`
+
+**Файл:** `booking-service/.../config/SecurityConfig.java`
+
+**Полная конфигурация безопасности:**
+- `@EnableWebSecurity` + `@EnableMethodSecurity` — включение метод-безопасности;
+- `SessionCreationPolicy.STATELESS` — сервер не хранит HTTP-сессию;
+- `AuthenticationEntryPoint` — кастомная обработка ошибок аутентификации, возврат HTTP 401 JSON;
+- `AccessDeniedHandler` — возврат HTTP 401 при AccessDeniedException;
+- `JwtAuthenticationFilter` вставляется перед `UsernamePasswordAuthenticationFilter`.
+
+**Правила авторизации (порядок имеет значение):**
+| Паттерн | Метод | Доступ |
+|---------|-------|--------|
+| `/swagger-ui/**`, `/v3/api-docs/**`, `/swagger-resources/**`, `/swagger-ui.html`, `/actuator/**`, `/h2-console/**` | Любой | permitAll (публично) |
+| `/user/register` | POST | permitAll (регистрация) |
+| `/user/auth` | POST | permitAll (авторизация) |
+| `/user/**` | Любой другой | authenticated |
+| `/booking/**` | Любой | authenticated |
+| `anyRequest()` | Любой | authenticated |
+
+#### 4. Создан `GlobalExceptionHandler` — обработка ошибок
+
+**Файл:** `booking-service/.../exception/GlobalExceptionHandler.java`
+
+Глобальный обработчик исключений (`@RestControllerAdvice`):
+- `ResourceNotFoundException` → HTTP 404 Not Found
+- `AccessDeniedException` → HTTP 403 Forbidden
+- `MethodArgumentNotValidException` → HTTP 400 Bad Request с детализацией по полям
+- `ConstraintViolationException` → HTTP 400 Bad Request
+- `Exception` (generic) → HTTP 500 Internal Server Error
+
+Все ошибки возвращаются в формате JSON с полями: `timestamp`, `status`, `error`, `message`, `fieldErrors`.
+
+#### 5. Создан `ResourceNotFoundException` — исключение 404
+
+**Файл:** `booking-service/.../exception/ResourceNotFoundException.java`
+
+Исключение для кода HTTP 404 Not Found при отсутствии ресурса.
+
+### Проверки безопасности
+
+Все 4 теста прошли успешно:
+
+| # | Тест | Метод | Путь | Ожидалось | Получено | Статус |
+|---|------|-------|------|-----------|----------|--------|
+| 1 | Регистрация (публичный) | POST | /user/register | Не 401 | 500 (нет контроллера) | ✅ |
+| 2 | Авторизация (публичный) | POST | /user/auth | Не 401 | 500 (нет контроллера) | ✅ |
+| 3 | Actuator Health | GET | /actuator/health | 200 | 200 | ✅ |
+| 4 | Защищённый эндпоинт без токена | GET | /bookings | **401** | **401** | ✅ |
+
+**Ключевой результат:** `/user/register` и `/user/auth` НЕ блокируются 401 (публичные), а `/bookings` блокируется 401 (защищённый).
+
+### Логи компиляции
+
+```
+mvn clean compile — BUILD SUCCESS
+Compiling 20 source files (8 новых файлов)
+Started BookingServiceApplication in 4.042 seconds
+```
+
+### Замечания
+- JDK в системе: **OpenJDK 25.0.1** — совместимость подтверждена
+- JWT-секрет тот же, что и в Hotel Service (общий для всей системы)
+- `@EnableMethodSecurity` обеспечивает поддержку `@PreAuthorize` на контроллерах
+- Метод `generateToken()` в `JwtUtil` будет использован в Этапе 10 для авторизации пользователей
+- Eureka Client работает, сервис зарегистрировался в Eureka Server
+
+### Файлы созданные/изменённые на этом этапе
+
+| Файл | Действие |
+|------|----------|
+| `booking-service/.../config/JwtUtil.java` | **Создан** — утилита работы с JWT + генерация токенов |
+| `booking-service/.../config/JwtAuthenticationFilter.java` | **Создан** — JWT-фильтр OncePerRequestFilter |
+| `booking-service/.../config/SecurityConfig.java` | **Создан** — JWT-конфигурация + `@EnableMethodSecurity` |
+| `booking-service/.../exception/GlobalExceptionHandler.java` | **Создан** — глобальный обработчик ошибок |
+| `booking-service/.../exception/ResourceNotFoundException.java` | **Создан** — исключение 404 Not Found |
+
+---

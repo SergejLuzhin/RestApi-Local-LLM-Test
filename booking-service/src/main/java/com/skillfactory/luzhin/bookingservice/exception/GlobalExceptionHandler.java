@@ -1,5 +1,7 @@
 package com.skillfactory.luzhin.bookingservice.exception;
 
+import com.skillfactory.luzhin.bookingservice.exception.HotelServiceException;
+import com.skillfactory.luzhin.bookingservice.exception.ResourceNotFoundException;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +22,7 @@ import java.util.Map;
  * <p>Обрабатываемые исключения:
  * <ul>
  *   <li>{@link ResourceNotFoundException} — ресурс не найден → HTTP 404</li>
+ *   <li>{@link HotelServiceException} — ошибка взаимодействия с Hotel Service → HTTP 502</li>
  *   <li>{@link AccessDeniedException} — недостаточных прав доступа → HTTP 401 (если не авторизован) / HTTP 403</li>
  *   <li>{@link MethodArgumentNotValidException} — ошибка валидации DTO → HTTP 400 с детализацией по полям</li>
  *   <li>{@link ConstraintViolationException} — нарушение ограничений → HTTP 400</li>
@@ -124,6 +127,25 @@ public class GlobalExceptionHandler {
                 exception.getMessage()
         );
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    /**
+     * Обработчик ошибки взаимодействия с Hotel Service.
+     * Возвращает HTTP 502 Bad Gateway при сбоях удалённого вызова
+     * (таймаут, недоступность сервиса, ошибки валидации).
+     *
+     * @param exception исключение ошибки Hotel Service
+     * @return ResponseEntity с HTTP 502 и JSON-описанием ошибки
+     */
+    @ExceptionHandler(HotelServiceException.class)
+    public ResponseEntity<ErrorResponse> handleHotelServiceError(HotelServiceException exception) {
+        ErrorResponse error = new ErrorResponse(
+                Instant.now(),
+                HttpStatus.BAD_GATEWAY.value(),
+                HttpStatus.BAD_GATEWAY.getReasonPhrase(),
+                exception.getMessage()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(error);
     }
 
     /**

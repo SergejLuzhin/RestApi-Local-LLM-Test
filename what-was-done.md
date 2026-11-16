@@ -1563,3 +1563,107 @@ Started BookingServiceApplication in 4.069 seconds
 | `booking-service/.../entity/Booking.java` | **Изменён** — добавлен @Setter |
 
 ---
+
+## Этап 11: Booking Service — Feign-клиент для Hotel Service
+
+### Дата выполнения
+16 ноября 2026
+
+### Что сделано
+
+#### 1. Созданы DTO для ответов Feign-клиента
+
+**AvailabilityResponse** — DTO для ответа от Hotel Service при подтверждении доступности номера:
+- `roomId` — идентификатор номера
+- `available` — флаг доступности
+- `message` — сообщение с результатом
+
+**ReleaseResponse** — DTO для ответа от Hotel Service при снятии блокировки:
+- `roomId` — идентификатор номера
+- `released` — флаг снятия блокировки
+- `message` — сообщение с результатом
+
+#### 2. Создан `HotelServiceClient` — Feign-клиент для Hotel Service
+
+**Файл:** `booking-service/.../client/HotelServiceClient.java`
+
+Feign-клиент с именем `hotel-service` (соответствует serviceId в Eureka Server).
+
+**Методы:**
+| Метод | Путь | Описание |
+|-------|------|----------|
+| `confirmAvailability` | `POST /api/rooms/{roomId}/confirm-availability` | Подтверждение доступности номера с временной блокировкой |
+| `releaseSlot` | `POST /api/rooms/{roomId}/release` | Компенсация: снятие временной блокировки |
+
+**Параметры методов:** `roomId`, `start`, `end`, `correlationId` (все через `@RequestParam` или `@PathVariable`).
+
+#### 3. Создан `FeignConfig` — конфигурация Feign-клиента
+
+**Файл:** `booking-service/.../config/FeignConfig.java`
+
+**Настройки:**
+| Настройка | Значение | Описание |
+|-----------|----------|----------|
+| Connect timeout | 5000 мс (5 сек) | Время ожидания TCP-соединения |
+| Read timeout | 10000 мс (10 сек) | Время ожидания ответа от сервера |
+| JWT-токен | `RequestInterceptor` | Автоматически добавляет `Authorization: Bearer <token>` из текущего HTTP-запроса |
+| ErrorDecoder | `FeignErrorDecoder` | Кастомный декодер для маппинга HTTP-ошибок в исключения |
+
+**JWT-интерсептор:** извлекает заголовок `Authorization` из текущего HTTP-запроса (через `ServletRequestAttributes`) и добавляет его во все запросы Feign. Если токен отсутствует — не добавляет (для внутренних вызовов без аутентификации).
+
+#### 4. Создан `FeignErrorDecoder` — декодер ошибок Feign
+
+**Файл:** `booking-service/.../config/FeignErrorDecoder.java`
+
+**Логика обработки:**
+1. Извлекает тело HTTP-ответа через `asInputStream()` (API Feign 13.6)
+2. Пытается десериализовать JSON в Map для извлечения поля `message`
+3. Формирует информативное сообщение: `Ошибка Hotel Service [409]: <message>. Метод: confirmAvailability`
+4. Возвращает исключение `HotelServiceException`
+
+**Fallback:** если JSON не распарсивается — используется стандартное сообщение по коду статуса.
+
+#### 5. Создан `HotelServiceException` — исключение сбоев удалённого сервиса
+
+**Файл:** `booking-service/.../exception/HotelServiceException.java`
+
+Исключение для обработки ошибок взаимодействия с Hotel Service (таймаут, недоступность, HTTP-ошибки).
+
+#### 6. Обновлён `GlobalExceptionHandler` Booking Service
+
+**Файл:** `booking-service/.../exception/GlobalExceptionHandler.java`
+
+Добавлен обработчик `HotelServiceException` → **HTTP 502 Bad Gateway** с JSON-описанием ошибки.
+
+### Проверки
+
+| Проверка | Результат |
+|----------|-----------|
+| `mvn clean compile` — весь проект | ✅ BUILD SUCCESS |
+| `mvn clean compile` — booking-service (30 файлов) | ✅ BUILD SUCCESS |
+| Booking Service запущен на порту 8082 | ✅ Успешный запуск за 3.871 сек |
+| Actuator Health | ✅ HTTP 200, `{"status":"UP"}` |
+
+### Замечания
+- JDK в системе: **OpenJDK 25.0.1** — совместимость подтверждена
+- Eureka Client работает, но Eureka Server не запущен — ошибки `Cannot execute request on any known server` ожидаемы
+- Версия Feign: **13.6** (из Spring Cloud OpenFeign 4.3.0)
+- **Подводная камень API Feign 13.6:** `Response.Body` не имеет `asString(Charset)` или `asBytes()`. Используется `asInputStream()` + `InputStream.readAllBytes()`
+- Предупреждение `uses or overrides a deprecated API` в `FeignConfig` — не критично, требует `mvn compile -Xlint:deprecation` для детализации
+- Предупреждение `unchecked or unsafe operations` в `FeignErrorDecoder` — не критично, из-за generic Map при десериализации JSON
+
+### Файлы созданные/изменённые на этом этапе
+
+| Файл | Действие |
+|------|----------|
+| `booking-service/.../client/dto/AvailabilityResponse.java` | **Создан** — DTO ответа confirm-availability |
+| `booking-service/.../client/dto/ReleaseResponse.java` | **Создан** — DTO ответа release |
+| `booking-service/.../client/HotelServiceClient.java` | **Создан** — FeignClient интерфейс |
+| `booking-service/.../config/FeignConfig.java` | **Создан** — конфигурация Feign (тайм-ауты, JWT, ErrorDecoder) |
+| `booking-service/.../config/FeignErrorDecoder.java` | **Создан** — декодер HTTP-ошибок в исключения |
+| `booking-service/.../exception/HotelServiceException.java` | **Создан** — исключение сбоев удалённого сервиса |
+| `booking-service/.../exception/GlobalExceptionHandler.java` | **Изменён** — добавлен обработчик HotelServiceException → HTTP 502 |
+
+**Этап 11 завершён.**
+
+---

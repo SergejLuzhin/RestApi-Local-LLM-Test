@@ -1667,3 +1667,201 @@ Feign-клиент с именем `hotel-service` (соответствует s
 **Этап 11 завершён.**
 
 ---
+
+## Этап 12: Booking Service — двухшаговое бронирование (основная логика)
+
+### Дата выполнения
+16 ноября 2026
+
+### Что сделано
+
+#### 1. Добавлена зависимость `spring-retry`
+
+**Файл:** `booking-service/pom.xml`
+
+Добавлена зависимость `spring-retry` — требуется для работы аннотации `@Retryable` из Spring Retry (используется вместе с Resilience4j Retry).
+
+```xml
+<dependency>
+    <groupId>org.springframework.retry</groupId>
+    <artifactId>spring-retry</artifactId>
+</dependency>
+```
+
+#### 2. Создан `RoomRecommendResponse` — DTO для рекомендованных номеров
+
+**Файл:** `booking-service/.../client/dto/RoomRecommendResponse.java`
+
+DTO для ответа от Hotel Service при запросе рекомендованных номеров (`GET /api/rooms/recommend`). Используется в логике автоподбора номера (`autoSelect = true`).
+
+**Поля:** `id`, `hotelId`, `hotelName`, `number`, `available`, `timesBooked`, `createdAt`, `updatedAt`.
+
+#### 3. Обновлён `HotelServiceClient` — добавлен метод автоподбора
+
+**Файл:** `booking-service/.../client/HotelServiceClient.java`
+
+Добавлен метод:
+```java
+@GetMapping("/api/rooms/recommend")
+List<RoomRecommendResponse> getRecommendedRooms();
+```
+
+Возвращает список свободных номеров, отсортированных по `timesBooked ASC, id ASC` (алгоритм равномерной загрузки, реализованный в Hotel Service).
+
+#### 4. Перезаписан `BookingService` — двухшаговая транзакция бронирования
+
+**Файл:** `booking-service/.../service/BookingService.java`
+
+**Полная переработка метода `createBooking`:**
+
+```
+createBooking(request, userId):
+  1. correlationId = UUID.randomUUID().toString()
+  2. Логируем: "Начало процесса создания бронирования"
+  3. Проверка идемпотентности: findByCorrelationId(correlationId)
+     - Если найдено — возвращаем существующее бронирование
+  4. Найти пользователя по userId
+  5. Определить roomId:
+     - autoSelect = true → getRecommendedRooms() → первый номер из списка
+     - autoSelect = false → request.getRoomId()
+  6. Создать Booking со статусом PENDING, сохранить в БД
+  7. Логируем: "Бронирование создано в статусе PENDING"
+  8. Попытка (retry с @Retryable):
+     a. confirmWithRetry(booking):
+        - hotelServiceClient.confirmAvailability(...)
+        - При успехе → Booking(CONFIRMED), save
+     b. Если исключение — выбрасываем HotelServiceException
+  9. Если успех → "Бронирование подтверждено"
+  10. Если ошибка → cancelBookingInternal() → Booking(CANCELLED)
+      + "Бронирование отменено (статус CANCELLED)"
+```
+
+**Метод `resolveRoomId` (private):**
+- `autoSelect = true` — запрос `hotelServiceClient.getRecommendedRooms()`, выбор первого номера
+- `autoSelect = false` — использование `request.getRoomId()`, проверка на null
+
+**Метод `confirmWithRetry` (public, @Retryable):**
+```java
+@Retryable(
+    value = {HotelServiceException.class},
+    maxAttempts = 3,
+    backoff = @Backoff(delay = 500, multiplier = 2, maxDelay = 5000)
+)
+@Transactional(propagation = REQUIRES_NEW)
+public void confirmWithRetry(Booking booking) {
+    hotelServiceClient.confirmAvailability(...);
+    booking.setStatus(CONFIRMED);
+    bookingRepository.save(booking);
+}
+```
+
+**Параметры retry:**
+- 3 максимум попыток
+- 500 мс начальная задержка
+- Множитель 2 (экспоненциальный рост: 500 → 1000 → 2000)
+- Макс. задержка 5000 мс
+- Повторяется при: `HotelServiceException` (включая таймауты, 5xx, 4xx)
+
+**Метод `cancelBookingInternal` (private):**
+- Переводит бронирование в статус `CANCELLED`
+- Идемпотентность: если уже `CANCELLED` — ничего не делает
+
+**Логирование (SLF4J):**
+- `correlationId` используется во всех логах для сквозного отслеживания
+- Логируются: начало процесса, выбор номера, создание PENDING, подтверждение/отмена
+- В логах ошибки Hotel Service — полный стек с `correlationId`
+
+#### 5. Обновлён `BookingServiceApplication`
+
+**Файл:** `booking-service/.../BookingServiceApplication.java`
+
+Добавлена аннотация `@EnableRetry` — необходимо для работы `@Retryable` на методах сервиса.
+
+#### 6. Обновлён `application.yml` Booking Service
+
+**Файл:** `booking-service/src/main/resources/application.yml`
+
+Добавлено:
+```yaml
+spring:
+  retry:
+    enabled: true
+```
+
+Обновлена конфигурация retry — добавлено `max-delay: 5000ms`.
+
+### Проверки
+
+| Проверка | Результат |
+|----------|-----------|
+| `mvn clean compile` — весь проект | ✅ BUILD SUCCESS (все 4 модуля) |
+| Booking Service запущен на порту 8082 | ✅ Успешный запуск за 5.756 сек |
+| Eureka регистрация BOOKING-SERVICE | ✅ STATUS=UP |
+| Actuator health | ✅ HTTP 200, `{"status":"UP"}` |
+| H2 in-memory инициализация | ✅ DB available |
+| `@EnableRetry` активен | ✅ Аннотация добавлена |
+
+### Логи компиляции
+
+```
+mvn clean compile — BUILD SUCCESS
+Compiling 31 source files (31 в booking-service)
+Started BookingServiceApplication in 5.756 seconds
+```
+
+### Архитектурные решения
+
+#### Решение 1: `@Retryable` на отдельном публичном методе
+
+**Проблема:** `@Retryable` работает через Spring AOP-прокси. Метод должен быть `public`, иначе прокси не может его обернуть.
+
+**Решение:** Создан отдельный публичный метод `confirmWithRetry`, который:
+- Содержит только вызов Hotel Service + перевод в CONFIRMED
+- Аннотирован `@Retryable` + `@Transactional(REQUIRES_NEW)`
+- Вызывается из `createBooking` внутри try-catch
+
+#### Решение 2: `REQUIRES_NEW` для `confirmWithRetry`
+
+**Проблема:** Если `confirmWithRetry` работает в той же транзакции, что и `createBooking`, то при откате retry-транзакции откатится и создание бронирования.
+
+**Решение:** `@Transactional(propagation = REQUIRES_NEW)` создаёт новую транзакцию для подтверждения доступности. Это гарантирует, что бронирование в статусе PENDING сохраняется в БД до вызова Hotel Service.
+
+#### Решение 3: Жёстко заданные параметры retry
+
+**Проблема:** Свойства `retry.*` в `application.yml` находятся внутри `resilience4j.retry.instances.booking-availability`, а Spring Retry `@Retryable` ожидает свойства на уровне `spring.retry` или `retry`. Выражения `${retry.*}` не резолвятся корректно.
+
+**Решение:** Использовать жёстко заданные значения в аннотации:
+```java
+@Retryable(
+    value = {HotelServiceException.class},
+    maxAttempts = 3,
+    backoff = @Backoff(delay = 500, multiplier = 2, maxDelay = 5000)
+)
+```
+
+#### Решение 4: `correlationId` как UUID при создании бронирования
+
+**Проблема:** Нужно обеспечить сквозную корреляцию для логирования всех шагов бронирования.
+
+**Решение:** `correlationId` генерируется один раз в начале `createBooking` и передаётся во все методы, включая Feign-вызовы к Hotel Service.
+
+### Файлы созданные/изменённые на этом этапе
+
+| Файл | Действие |
+|------|----------|
+| `booking-service/pom.xml` | **Изменён** — добавлен `spring-retry` |
+| `booking-service/.../client/dto/RoomRecommendResponse.java` | **Создан** — DTO рекомендованных номеров |
+| `booking-service/.../client/HotelServiceClient.java` | **Изменён** — добавлен `getRecommendedRooms()` |
+| `booking-service/.../service/BookingService.java` | **Перезаписан** — двухшаговое бронирование |
+| `booking-service/.../BookingServiceApplication.java` | **Изменён** — добавлен `@EnableRetry` |
+| `booking-service/src/main/resources/application.yml` | **Изменён** — добавлен `spring.retry.enabled`, `max-delay` |
+
+### Замечания
+- JDK в системе: **OpenJDK 25.0.1** — совместимость подтверждена
+- Booking Service зарегистрировался в Eureka Server (STATUS=UP)
+- `@Retryable` с `REQUIRES_NEW` гарантирует, что PENDING-бронирование сохраняется до вызова Hotel Service
+- Компенсация (отмена + releaseSlot) будет добавлена в Этапе 13 (когда создадутся контроллеры и станет возможна полная проверка цикла)
+- Компенсация `releaseSlot` в Hotel Service уже реализована в Этапе 5
+
+---
+

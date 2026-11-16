@@ -4,6 +4,8 @@ server:
 spring:
   application:
     name: booking-service
+  retry:
+    enabled: true
   datasource:
     url: jdbc:h2:mem:bookingdb
     driver-class-name: org.h2.Driver
@@ -42,6 +44,7 @@ resilience4j:
         wait-duration: 500ms
         enable-exponential-backoff: true
         exponential-backoff-multiplier: 2
+        max-delay: 5000ms
         retry-exceptions:
           - java.net.SocketTimeoutException
           - java.net.ConnectException

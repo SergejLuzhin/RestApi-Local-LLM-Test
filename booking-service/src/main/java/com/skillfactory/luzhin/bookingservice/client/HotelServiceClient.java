@@ -2,13 +2,16 @@ package com.skillfactory.luzhin.bookingservice.client;
 
 import com.skillfactory.luzhin.bookingservice.client.dto.AvailabilityResponse;
 import com.skillfactory.luzhin.bookingservice.client.dto.ReleaseResponse;
+import com.skillfactory.luzhin.bookingservice.client.dto.RoomRecommendResponse;
 import com.skillfactory.luzhin.bookingservice.config.FeignConfig;
 import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * Feign-клиент для взаимодействия с Hotel Management Service.
@@ -36,6 +39,24 @@ import java.time.LocalDateTime;
         configuration = FeignConfig.class
 )
 public interface HotelServiceClient {
+
+    /**
+     * Возвращает список рекомендованных номеров для автоподбора.
+     *
+     * <p>Возвращает все доступные номера, отсортированные по возрастанию
+     * счётчика бронирований (timesBooked ASC), а при равенстве — по идентификатору (id ASC).
+     * Этот алгоритм обеспечивает равномерную загрузку номеров,
+     * избегая «простоя» одних номеров при перегрузке других.
+     *
+     * <p>Вызывается из {@code BookingService.createBooking} при автоподборе номера
+     * (когда в запросе указан {@code autoSelect = true}).
+     *
+     * @return список рекомендованных номеров, отсортированный для автоподбора
+     * @throws com.skillfactory.luzhin.bookingservice.exception.HotelServiceException
+     *         если возникла ошибка удалённого сервиса
+     */
+    @GetMapping("/api/rooms/recommend")
+    List<RoomRecommendResponse> getRecommendedRooms();
 
     /**
      * Подтверждает доступность номера на запрошенные даты.

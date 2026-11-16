@@ -85,6 +85,12 @@
             <artifactId>resilience4j-circuitbreaker</artifactId>
         </dependency>
 
+        <!-- Spring Retry — требуется для @Retryable (используется Resilience4j Retry) -->
+        <dependency>
+            <groupId>org.springframework.retry</groupId>
+            <artifactId>spring-retry</artifactId>
+        </dependency>
+
         <!-- Spring Boot Validation -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

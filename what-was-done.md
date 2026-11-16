@@ -1057,3 +1057,174 @@ verify(hotelRepository, never()).delete(any(Hotel.class));
 | `hotel-service/.../repository/HotelRepositoryTest.java` | **Создан** — 8 `@DataJpaTest` тестов |
 
 **Этап 7 завершён полностью. Все 44 теста Hotel Service написаны и проходят.**
+
+---
+
+## Этап 8: Booking Service — сущности, репозитории, DTO
+
+### Дата выполнения
+16 ноября 2026
+
+### Что сделано
+
+#### 1. Обновлён `booking-service/pom.xml`
+
+Добавлена зависимость `spring-boot-starter-validation` для валидации входных данных (DTO).
+
+**Добавленная зависимость:**
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-validation</artifactId>
+</dependency>
+```
+
+**Уже присутствовавшие зависимости:**
+- `spring-boot-starter-web`
+- `spring-boot-starter-data-jpa`
+- `h2`
+- `spring-boot-starter-security`
+- `jjwt-api`, `jjwt-impl`, `jjwt-jackson` (0.12.6)
+- `spring-cloud-starter-netflix-eureka-client`
+- `spring-cloud-starter-openfeign`
+- `resilience4j-spring-boot3`, `resilience4j-retry`, `resilience4j-circuitbreaker`
+- `springdoc-openapi-starter-webmvc-ui`
+
+#### 2. Созданы перечисления (Enums)
+
+**UserRole** — роли пользователей:
+- `USER` — обычный пользователь (личные операции: регистрация, просмотр отелей, бронирование);
+- `ADMIN` — администратор (управление отелями, номерами, пользователями).
+
+**BookingStatus** — статусы бронирования:
+- `PENDING` — ожидает подтверждения от Hotel Service;
+- `CONFIRMED` — подтверждено и активно;
+- `CANCELLED` — отменено (ошибка подтверждения, таймаут или ручная отмена).
+
+#### 3. Созданы сущности JPA
+
+**User** — сущность «Пользователь системы»:
+- `id` (Long, auto-generated)
+- `username` (String, unique, nullable=false, length=255) — имя пользователя;
+- `password` (String, nullable=false) — хешированный пароль (BCrypt);
+- `role` (UserRole enum, nullable=false) — роль пользователя;
+- `createdAt` (LocalDateTime) — время создания;
+- `updatedAt` (LocalDateTime) — время последнего обновления;
+- Методы `@PrePersist` (onCreate) и `@PreUpdate` (onUpdate).
+
+**Booking** — сущность «Бронирование»:
+- `id` (Long, auto-generated)
+- `user` (User, ManyToOne, LAZY) — пользователь, создавший бронирование;
+- `roomId` (Long, nullable=false) — идентификатор номера (без внешнего ключа);
+- `startDate` (LocalDateTime, nullable=false) — дата начала;
+- `endDate` (LocalDateTime, nullable=false) — дата окончания;
+- `status` (BookingStatus enum, nullable=false) — текущий статус;
+- `createdAt` (LocalDateTime) — время создания;
+- `correlationId` (String, nullable=false, length=64) — идентификатор корреляции;
+- Индексы: `idx_booking_user_id`, `idx_booking_correlation_id`, `idx_booking_room_id_start_end`;
+- Метод `hasDateOverlap(LocalDateTime, LocalDateTime)` — проверка пересечения дат;
+- Методы `@PrePersist` (onCreate).
+
+#### 4. Созданы репозитории
+
+**UserRepository** — JpaRepository<User, Long>:
+- `findByUsername(String)` — поиск пользователя по имени;
+- `existsByUsername(String)` — проверка уникальности имени.
+
+**BookingRepository** — JpaRepository<Booking, Long>:
+- `findByUserId(Long)` — поиск всех бронирований пользователя;
+- `findByStatus(BookingStatus)` — поиск бронирований по статусу;
+- `existsByRoomIdAndOverlapDates(roomId, start, end)` — проверка пересечений (PENDING/CONFIRMED);
+- `findByIdWithUser(Long id)` — поиск с загруженным пользователем (JOIN FETCH);
+- `findByCorrelationId(String)` — поиск по корреляционному ID (идемпотентность).
+
+#### 5. Созданы DTO
+
+**UserRegisterRequest** — запрос регистрации:
+- `username` (NotBlank, 3-50 символов);
+- `password` (NotBlank, мин. 6 символов).
+
+**UserLoginRequest** — запрос авторизации:
+- `username` (NotBlank);
+- `password` (NotBlank).
+
+**UserResponse** — ответ с данными пользователя:
+- `id`, `username`, `role`, `createdAt`, `updatedAt`.
+
+**UserUpdateRequest** — запрос обновления пользователя (PATCH):
+- `username` (Size 3-50, опционально);
+- `password` (Size мин. 6, опционально).
+
+**BookingCreateRequest** — запрос создания бронирования:
+- `roomId` (NotNull, требуется если autoSelect=false);
+- `startDate` (NotNull, @Future);
+- `endDate` (NotNull, @Future);
+- `autoSelect` (boolean) — флаг автоподбора номера.
+
+**BookingResponse** — ответ с данными бронирования:
+- `id`, `userId`, `username`, `roomId`, `startDate`, `endDate`, `status`, `createdAt`.
+
+#### 6. Созданы MapStruct-мапперы
+
+**UserMapper** (`@Mapper(componentModel = "spring")`):
+- `toEntity(UserRegisterRequest)` — регистрация (с игнорированием password и role);
+- `toResponse(User)` — преобразование в DTO;
+- `toResponseList(List<User>)` — преобразование списка.
+
+**BookingMapper** (`@Mapper(componentModel = "spring")`):
+- `toEntity(BookingCreateRequest)` — создание бронирования (с игнорированием user, status, correlationId);
+- `toResponse(Booking)` — преобразование с извлечением userId/username из user;
+- `toResponseList(List<Booking>)` — преобразование списка.
+
+### Проверки
+
+| Проверка | Результат |
+|----------|-----------|
+| `mvn clean compile` — booking-service | ✅ BUILD SUCCESS |
+| `mvn clean compile` — весь проект | ✅ BUILD SUCCESS |
+| Booking Service запущен на порту 8082 | ✅ |
+| Регистрация в Eureka (STATUS=UP) | ✅ |
+| H2 in-memory инициализация | ✅ DB available at 'jdbc:h2:mem:bookingdb' |
+| H2 Console на `/h2-console` | ✅ |
+| Actuator health endpoint | ✅ HTTP 200 |
+
+### Логи запуска (ключевые строки)
+```
+Starting BookingServiceApplication using Java 25.0.1
+...
+H2 console available at '/h2-console'. Database available at 'jdbc:h2:mem:bookingdb'
+Tomcat started on port 8082 (http) with context path '/'
+Registering application BOOKING-SERVICE with eureka with status UP
+DiscoveryClient_BOOKING-SERVICE/... - registration status: 204
+Started BookingServiceApplication in 3.581 seconds
+```
+
+### Замечания
+- JDK в системе: **OpenJDK 25.0.1** — совместимость подтверждена
+- Eureka Client работает, сервис зарегистрировался в Eureka Server
+- `correlationId` в сущности Booking используется для идемпотентности и сквозного логирования
+- Индексы на `room_id, start_date, end_date` оптимизируют проверку пересечений
+- `UserMapper` игнорирует `password` и `role` при маппинге — эти поля устанавливаются в сервисе (хеширование пароля, роль по умолчанию)
+- `BookingMapper` извлекает `userId` и `username` из связанной сущности `User` для DTO-ответа
+
+### Файлы созданные/изменённые на этом этапе
+
+| Файл | Действие |
+|------|----------|
+| `booking-service/pom.xml` | **Изменён** — добавлена validation-зависимость |
+| `booking-service/.../entity/UserRole.java` | **Создан** — enum ролей пользователей |
+| `booking-service/.../entity/BookingStatus.java` | **Создан** — enum статусов бронирования |
+| `booking-service/.../entity/User.java` | **Создан** — сущность пользователя |
+| `booking-service/.../entity/Booking.java` | **Создан** — сущность бронирования |
+| `booking-service/.../repository/UserRepository.java` | **Создан** — репозиторий пользователей |
+| `booking-service/.../repository/BookingRepository.java` | **Создан** — репозиторий бронирований |
+| `booking-service/.../dto/UserRegisterRequest.java` | **Создан** — запрос регистрации |
+| `booking-service/.../dto/UserLoginRequest.java` | **Создан** — запрос авторизации |
+| `booking-service/.../dto/UserResponse.java` | **Создан** — ответ о пользователе |
+| `booking-service/.../dto/UserUpdateRequest.java` | **Создан** — запрос обновления пользователя |
+| `booking-service/.../dto/BookingCreateRequest.java` | **Создан** — запрос создания бронирования |
+| `booking-service/.../dto/BookingResponse.java` | **Создан** — ответ о бронировании |
+| `booking-service/.../mapper/UserMapper.java` | **Создан** — MapStruct-маппер User |
+| `booking-service/.../mapper/BookingMapper.java` | **Создан** — MapStruct-маппер Booking |
+
+---

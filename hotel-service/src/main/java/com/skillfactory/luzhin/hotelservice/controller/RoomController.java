@@ -59,7 +59,7 @@ public class RoomController {
     @GetMapping
     @Operation(
             summary = "Получить доступные номера",
-            description = "Возвращает все номера с operacionno доступностью. Не учитывает занятость по датам. Доступно для USER и ADMIN."
+            description = "Возвращает все номера, которые операционно доступны. Не учитывает занятость по датам. Доступно для USER и ADMIN."
     )
     @ApiResponse(responseCode = "200", description = "Список номеров успешно получен")
     public ResponseEntity<List<RoomResponse>> getAllAvailableRooms() {

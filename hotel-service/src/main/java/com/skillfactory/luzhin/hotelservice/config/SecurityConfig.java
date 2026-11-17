@@ -13,7 +13,6 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -158,7 +157,7 @@ public class SecurityConfig {
 
         // Разрешаем H2 Console фрейм-опции для работы в iframe
         http.headers(headers ->
-                headers.frameOptions(frameOptions -> frameOptions.sameOrigin()));
+                headers.frameOptions(frameOptions -> frameOptions.sameOrigin())); // @SuppressWarnings("SpringFrameworkOverview") lambda is clearer here
 
         return http.build();
     }

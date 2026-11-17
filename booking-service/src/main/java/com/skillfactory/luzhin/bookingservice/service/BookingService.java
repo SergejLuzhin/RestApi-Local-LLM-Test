@@ -246,7 +246,7 @@ public class BookingService {
      * @throws HotelServiceException если все попытки подтверждения не удаллись
      */
     @Retryable(
-            value = {HotelServiceException.class},
+            include = {HotelServiceException.class},
             maxAttempts = 3,
             backoff = @Backoff(
                     delay = 500,

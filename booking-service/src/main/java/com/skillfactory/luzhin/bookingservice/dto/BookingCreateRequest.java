@@ -9,7 +9,6 @@ import java.time.LocalDateTime;
 /**
  * DTO (Transfer Object) для запроса на создание нового бронирования.
  * Используется в эндпоинте POST /bookings.
- *
  * Поля:
  * - roomId — идентификатор номера (обязательный, если autoSelect = false);
  * - startDate — дата и время начала бронирования (обязательная, будущая);

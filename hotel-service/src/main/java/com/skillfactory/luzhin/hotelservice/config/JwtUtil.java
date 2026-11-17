@@ -35,6 +35,7 @@ public class JwtUtil {
      * Максимальное время жизни токена в миллисекундах (по умолчанию — 1 час).
      * Хранится для совместимости API — текущая проверка использует {@code expiration} claim внутри токена.
      */
+    @SuppressWarnings("unused") // инициализируется через @Value, используется для совместимости API
     private final long expirationMs;
 
     /**

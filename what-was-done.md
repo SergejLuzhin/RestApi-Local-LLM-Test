@@ -555,7 +555,7 @@ Started HotelServiceApplication in 2.601 seconds
 **Проблема:** `@PreAuthorize("hasRole('ADMIN')")` при отсутствии токена генерировал `AccessDeniedException`, который обрабатывался как HTTP 403 Forbidden.
 
 **Решение:** Добавлена проверка статуса аутентификации в обработчике `AccessDeniedException`:
-```java
+```text
 Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 if (authentication == null || authentication instanceof AnonymousAuthenticationToken) {
     return HTTP 401 (пользователь не авторизован)
@@ -696,7 +696,7 @@ Started HotelServiceApplication in 4.26 seconds
 **Проблема:** `@AutoConfigureMockMvc` не срабатывает из-за `web-application-type: none` в тестовом `application.yml` (установлено для отключения веб-сервера). Даже при изменении на `MOCK`, `@AutoConfigureMockMvc` не авто-конфигурируется корректно с `@SpringBootTest` в данной конфигурации.
 
 **Итоговое решение:** Ручная настройка MockMvc:
-```java
+```
 mockMvc = MockMvcBuilders.webAppContextSetup(wac)
     .apply(springSecurity())
     .build();
@@ -726,7 +726,7 @@ YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXpBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWjEyMzQ1Njc4
 
 #### Правило 2: Настроить MockMvc вручную через `MockMvcBuilders`
 
-```java
+```
 mockMvc = MockMvcBuilders.webAppContextSetup(wac)
     .apply(springSecurity())
     .build();
@@ -825,7 +825,7 @@ eureka:
 
 #### Ручная настройка MockMvc
 
-```java
+```
 mockMvc = MockMvcBuilders.webAppContextSetup(wac)
     .apply(springSecurity())
     .build();
@@ -834,7 +834,7 @@ mockMvc = MockMvcBuilders.webAppContextSetup(wac)
 #### Паттерн запроса с `@RequestParam`
 
 Для эндпоинтов `confirm-availability` и `release` используются query-параметры:
-```java
+```
 .param("start", start.toString())
 .param("end", end.toString())
 .param("correlationId", "test-correlation-001")
@@ -901,7 +901,7 @@ mockMvc = MockMvcBuilders.webAppContextSetup(wac)
 #### Верификация вызовов моков
 
 Каждый тест проверяет не только результат, но и то, какие методы были вызваны:
-```java
+```
 verify(roomRepository, times(1)).findByIdWithHotel(roomId);
 verify(bookingRepository, never()).save(any(Booking.class));
 ```
@@ -969,7 +969,7 @@ verify(bookingRepository, never()).save(any(Booking.class));
 #### Верификация never() вызовов
 
 Для ошибок обновления/удаления несуществующего отеля проверяется, что `save()` и `delete()` **не вызывались**:
-```java
+```
 verify(hotelRepository, never()).save(any(Hotel.class));
 verify(hotelRepository, never()).delete(any(Hotel.class));
 ```
@@ -1420,7 +1420,7 @@ DTO для передачи JWT-токена вместе с данными по
 **Файл:** `booking-service/.../exception/ResourceNotFoundException.java`
 
 Добавлен второй конструктор для поиска по не-ID идентификатору (например, username):
-```java
+```
 public ResourceNotFoundException(String resourceName, String identifier)
 ```
 
@@ -1741,7 +1741,7 @@ createBooking(request, userId):
 - `autoSelect = false` — использование `request.getRoomId()`, проверка на null
 
 **Метод `confirmWithRetry` (public, @Retryable):**
-```java
+```
 @Retryable(
     value = {HotelServiceException.class},
     maxAttempts = 3,
@@ -1831,7 +1831,7 @@ Started BookingServiceApplication in 5.756 seconds
 **Проблема:** Свойства `retry.*` в `application.yml` находятся внутри `resilience4j.retry.instances.booking-availability`, а Spring Retry `@Retryable` ожидает свойства на уровне `spring.retry` или `retry`. Выражения `${retry.*}` не резолвятся корректно.
 
 **Решение:** Использовать жёстко заданные значения в аннотации:
-```java
+```
 @Retryable(
     value = {HotelServiceException.class},
     maxAttempts = 3,
@@ -2859,8 +2859,8 @@ springdoc:
 
 **Проблема:** Аннотация `@MockBean` помечена как deprecated в Spring Boot 3.4.0 и может быть удалена в будущих версиях. IntelliJ показывает ошибку `Error:(16, 51) 'org.springframework.boot.test.mock.mockito.MockBean' is deprecated since version 3.4.0 and marked for removal`.
 
-**Решение:** Добавлен `@SuppressWarnings("deprecation")` на уровне класса с комментарием о том, что замена `@MockitoBean` ещё не стабильна:
-```java
+**Решение:** Добавлен `@SuppressWarnings("deprecation")` на уровень поля `@MockBean`:
+```
 @SuppressWarnings("deprecation") // @MockBean deprecated since Spring Boot 3.4, @MockitoBean replacement not yet stable
 class BookingControllerTest {
 ```
@@ -2986,7 +2986,7 @@ private String generateToken() {
 **Проблема:** Методы `@PrePersist` и `@PreUpdate` помечены IntelliJ как "never used", так как IDE не распознаёт JPA lifecycle callbacks.
 
 **Решение:** Добавлен `@SuppressWarnings("unused")` с поясняющим комментарием на каждый метод:
-```java
+```
 @SuppressWarnings("unused") // вызывается Hibernate через JPA lifecycle callbacks
 @PrePersist
 protected void onCreate() { ... }
@@ -2999,10 +2999,10 @@ protected void onCreate() { ... }
 **Проблема:** Поле `expirationMs` инициализируется из `@Value("${jwt.expiration-ms}")`, но нигде не используется — текущая проверка истечения токена использует claim `exp` внутри самого JWT.
 
 **Решение:** Обновлён Javadoc-комментарий поля:
-```java
+```
 /**
  * Максимальное время жизни токена в миллисекундах (по умолчанию — 1 час).
- * Хранится для совместимости API — текущая проверка использует {@code expiration} claim внутри токена.
+ * Хранится для совместимости API — текущая проверка использует expiration claim внутри токена.
  */
 private final long expirationMs;
 ```
@@ -3014,7 +3014,7 @@ private final long expirationMs;
 **Проблема:** IntelliJ не распознаёт аннотацию `@RestControllerAdvice` и помечает класс и все `@ExceptionHandler` методы как "never used".
 
 **Решение:** Добавлен `@SuppressWarnings({"unused", "WeakerAccess"})` на уровень класса с комментарием:
-```java
+```
 @RestControllerAdvice
 @SuppressWarnings({"unused", "WeakerAccess"}) // методы вызываются Spring через механизм обработки исключений
 public class GlobalExceptionHandler { ... }
@@ -3027,7 +3027,7 @@ public class GlobalExceptionHandler { ... }
 **Проблема:** IntelliJ не распознаёт Spring Security bean-методы и поля.
 
 **Решение:** Добавлен `@SuppressWarnings("unused")` на уровень класса:
-```java
+```
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -3043,7 +3043,7 @@ public class SecurityConfig { ... }
 **Проблема:** IntelliJ не распознаёт Spring MVC диспетчеризацию HTTP-запросов к `@RestController` методам.
 
 **Решение:** Добавлен `@SuppressWarnings("unused")` на уровень класса:
-```java
+```
 @RestController
 @RequestMapping("/rooms")
 @RequiredArgsConstructor

@@ -30,7 +30,7 @@ import java.util.Map;
  * @see org.springframework.web.bind.annotation.RestControllerAdvice
  */
 @RestControllerAdvice
-@SuppressWarnings({"unused", "WeakerAccess"}) // методы вызываются Spring через механизм обработки исключений
+@SuppressWarnings("unused") // методы вызываются Spring через механизм обработки исключений
 public class GlobalExceptionHandler {
 
     /**

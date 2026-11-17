@@ -51,18 +51,21 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @TestPropertySource(properties = {
         "jwt.secret=YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXpBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWjEyMzQ1Njc4OTA="
 })
-@SuppressWarnings("deprecation") // @MockBean deprecated since Spring Boot 3.4, @MockitoBean replacement not yet stable
 class BookingControllerTest {
 
     /**
      * Mock для сервиса бронирований — все вызовы бизнес-логики мокнуты.
+     * Примечание: @MockBean deprecated since Spring Boot 3.4, @MockitoBean replacement
+     * not yet stable — ошибка IDE игнорируется, требуется настройка IDE inspections.
      */
     @MockBean
     private BookingService bookingService;
 
+    @SuppressWarnings("SpringJavaInjectionPointsAutowiringInspection") // Spring @Value injects at runtime, IDE doesn't recognize
     @Value("${jwt.secret}")
     private String jwtSecret;
 
+    @SuppressWarnings("SpringJavaInjectionPointsAutowiringInspection") // Spring @Autowired injects at runtime, IDE doesn't recognize
     @Autowired
     private WebApplicationContext wac;
 

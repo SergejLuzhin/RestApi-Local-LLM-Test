@@ -10,7 +10,7 @@ import lombok.*;
  *
  * <p>Содержит информацию о результате компенсации (снятия блокировки слота).
  *
- * @see com.skillfactory.luzhin.hotelservice.controller.RoomController
+ * @see <a href="https://localhost:8081/swagger-ui.html">Hotel Service RoomController</a>
  */
 @Data
 @NoArgsConstructor

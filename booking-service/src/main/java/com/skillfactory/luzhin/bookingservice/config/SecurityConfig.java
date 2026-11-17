@@ -95,7 +95,7 @@ public class SecurityConfig {
      *   <li>Swagger/OpenAPI ресурсы — доступ без аутентификации</li>
      *   <li>POST /user/register — без аутентификации (регистрация)</li>
      *   <li>POST /user/auth — без аутентификации (авторизация)</li>
-     *   <li>Все остальные эндпоинты (/user/**, /booking/**) — требуют аутентификации</li>
+     *   <li>Все остальные эндпоинты (/user/**, /bookings/**) — требуют аутентификации</li>
  * </ul>
      *
      * @param http           объект HttpSecurity для настройки
@@ -132,7 +132,7 @@ public class SecurityConfig {
 
                         // Все остальные запросы к API требуют аутентификации
                         .requestMatchers("/user/**").authenticated()
-                        .requestMatchers("/booking/**").authenticated()
+                        .requestMatchers("/bookings/**").authenticated() // бронирования (POST/GET/DELETE)
 
                         // Остальные запросы требуют аутентификации
                         .anyRequest().authenticated()

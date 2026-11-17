@@ -2665,3 +2665,62 @@ springdoc:
 
 ---
 
+## Исправление бага маршрутизации Booking Service через Gateway
+
+### Дата исправления
+17 ноября 2026
+
+### Обнаруженная проблема
+
+При проверке актуального кода перед Этапом 17 было выявлено, что **баг маршрутизации был актуальным, а не устаревшей записью в логах Этапа 14.**
+
+**Суть бага:** контроллеры Booking Service маппились на `/booking`, но `RewritePath` в Gateway преобразовывал `/api/bookings/...` → `/bookings/...`, что приводило к рассинхронизации путей.
+
+| Gateway path | RewritePath → | BookingController ждал | Результат |
+|---|---|---|---|
+| `GET /api/bookings/bookings` | → `/bookings/bookings` | `/booking/bookings` | ❌ 404 |
+| `GET /api/bookings/1` | → `/bookings/1` | `/booking/{id}` | ❌ 404 |
+| `DELETE /api/bookings/1` | → `/bookings/1` | `/booking/{id}` | ❌ 404 |
+
+**Причина:** predicate `Path=/api/bookings/**` ловит и `/api/bookings/bookings`, и `/api/booking/...`, но RewritePath даёт `/bookings/*`, а контроллер маппился на `/booking/*`.
+
+### Что было исправлено
+
+| Файл | Изменение |
+|------|-----------|
+| `booking-service/.../controller/BookingController.java` | `@RequestMapping("/booking")` → `@RequestMapping("/bookings")` |
+| `booking-service/.../config/SecurityConfig.java` | `/booking/**` → `/bookings/**` (2 места) |
+| `booking-service/.../controller/BookingControllerTest.java` | Все пути `/booking/...` → `/bookings/...` (12 замен) |
+| `booking-service/.../controller/BookingController.java` (комментарии) | `GET /booking/{id}` → `GET /bookings/{id}`, `DELETE /booking/{id}` → `DELETE /bookings/{id}` |
+
+### Итоговая схема маршрутизации (исправленная)
+
+| Gateway path | RewritePath → | Backend path | Контроллер | Статус |
+|---|---|---|---|---|
+| `POST /api/user/register` | → `/user/register` | `/user/register` | AuthController | ✅ |
+| `POST /api/user/auth` | → `/user/auth` | `/user/auth` | AuthController | ✅ |
+| `POST /api/bookings` | → `/bookings` | `/bookings` | BookingController | ✅ |
+| `GET /api/bookings/bookings` | → `/bookings/bookings` | `/bookings/bookings` | BookingController | ✅ |
+| `GET /api/bookings/1` | → `/bookings/1` | `/bookings/{id}` | BookingController | ✅ |
+| `DELETE /api/bookings/1` | → `/bookings/1` | `/bookings/{id}` | BookingController | ✅ |
+| `POST /api/hotels` | → `/hotels` | `/hotels` | HotelController | ✅ |
+| `GET /api/rooms/recommend` | → `/rooms/recommend` | `/rooms/recommend` | RoomController | ✅ |
+
+### Проверки
+
+| Проверка | Результат |
+|----------|-----------|
+| `mvn clean compile` — весь проект | ✅ BUILD SUCCESS |
+| `mvn test` — Booking Service (25 тестов) | ✅ Все прошли |
+| `mvn test` — весь проект (67 тестов) | ✅ Все прошли |
+
+### Файлы изменённые на этом этапе
+
+| Файл | Действие |
+|------|----------|
+| `booking-service/.../controller/BookingController.java` | **Изменён** — `@RequestMapping` + комментарии |
+| `booking-service/.../config/SecurityConfig.java` | **Изменён** — пути + комментарии |
+| `booking-service/.../controller/BookingControllerTest.java` | **Изменён** — все пути тестов |
+
+---
+

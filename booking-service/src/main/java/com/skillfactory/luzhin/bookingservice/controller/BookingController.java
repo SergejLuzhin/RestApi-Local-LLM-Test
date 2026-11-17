@@ -28,10 +28,10 @@ import java.util.List;
  *
  * <p>Основные операции:
  * <ul>
- *   <li>POST /booking — создание бронирования (с выбором или автоподбором номера)</li>
- *   <li>GET /booking/{id} — получение бронирования по идентификатору</li>
+ *   <li>POST /bookings — создание бронирования (с выбором или автоподбором номера)</li>
+ *   <li>GET /bookings/{id} — получение бронирования по идентификатору</li>
  *   <li>GET /bookings — получение истории бронирований текущего пользователя</li>
- *   <li>DELETE /booking/{id} — отмена бронирования</li>
+ *   <li>DELETE /bookings/{id} — отмена бронирования</li>
  * </ul>
  *
  * <p>При создании бронирования поддерживается два режима:
@@ -43,7 +43,7 @@ import java.util.List;
  * @see BookingService
  */
 @RestController
-@RequestMapping("/booking")
+@RequestMapping("/bookings")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('USER')")
 @Tag(name = "Booking Controller", description = "API для управления бронированиями")

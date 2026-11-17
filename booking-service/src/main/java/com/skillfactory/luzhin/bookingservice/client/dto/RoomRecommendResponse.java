@@ -23,7 +23,7 @@ import lombok.*;
  *   <li>{@code updatedAt} — дата и время последнего обновления записи.</li>
  * </ul>
  *
- * @see com.skillfactory.luzhin.hotelservice.controller.RoomController#getRecommendedRooms
+ * @see com.skillfactory.luzhin.hotelservice.controller.RoomController
  */
 @Data
 @NoArgsConstructor

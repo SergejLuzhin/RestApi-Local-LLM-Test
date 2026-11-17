@@ -33,6 +33,7 @@ public class JwtUtil {
 
     /**
      * Максимальное время жизни токена в миллисекундах (по умолчанию — 1 час).
+     * Хранится для совместимости API — текущая проверка использует {@code expiration} claim внутри токена.
      */
     private final long expirationMs;
 
@@ -40,7 +41,7 @@ public class JwtUtil {
      * Конструктор с автоматической загрузкой конфигурации JWT из application.yml.
      *
      * @param secretBase64 Base64-закодированный секретный ключ для подписи токенов
-     * @param expirationMs максимальное время жизни токена в миллисекундах
+     * @param expirationMs максимальное время жизни токена в миллисекундах (резервное поле)
      */
     public JwtUtil(
             @Value("${jwt.secret}") String secretBase64,

@@ -45,6 +45,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/bookings")
 @RequiredArgsConstructor
+@SuppressWarnings("unused") // методы вызываются Spring MVC через диспетчеризацию HTTP-запросов
 @PreAuthorize("hasRole('USER')")
 @Tag(name = "Booking Controller", description = "API для управления бронированиями")
 public class BookingController {

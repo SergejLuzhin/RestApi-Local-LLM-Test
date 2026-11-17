@@ -177,7 +177,7 @@ public class BookingService {
             log.error("Подтверждение доступности не удалось после всех повторов. " +
                     "correlationId={}, bookingId={}, roomId={}. Причина: {}",
                     correlationId, savedBooking.getId(), roomId, e.getMessage());
-            cancelBookingInternal(savedBooking.getId(), userId, correlationId);
+            cancelBookingInternal(savedBooking.getId(), correlationId);
             return bookingMapper.toResponse(savedBooking);
         }
 
@@ -230,7 +230,7 @@ public class BookingService {
      * <p>Вызывает Hotel Service для подтверждения доступности номера на заданный период.
      * При успешном ответе переводит бронирование в статус CONFIRMED.
      *
-     * <p>Повторные попытки настраиваются через Resilience4j Retry
+     * <p>Повторные попытки настраиваются через Spring Retry
      * (configId = {@code booking-availability} в {@code application.yml}):
      * <ul>
      *   <li>Максимум попыток: 3</li>
@@ -334,7 +334,7 @@ public class BookingService {
         }
 
         // Переводим в статус CANCELLED
-        cancelBookingInternal(bookingId, userId, booking.getCorrelationId());
+        cancelBookingInternal(bookingId, booking.getCorrelationId());
     }
 
     /**
@@ -347,10 +347,9 @@ public class BookingService {
      * компенсации после неудачного подтверждения доступности.
      *
      * @param bookingId     идентификатор бронирования
-     * @param userId        идентификатор пользователя
      * @param correlationId корреляционный идентификатор для логирования
      */
-    private void cancelBookingInternal(Long bookingId, Long userId, String correlationId) {
+    private void cancelBookingInternal(Long bookingId, String correlationId) {
         Booking booking = bookingRepository.findByIdWithUser(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Бронирование", bookingId));
 

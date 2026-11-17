@@ -1,10 +1,8 @@
 package com.skillfactory.luzhin.bookingservice.controller;
 
-import com.skillfactory.luzhin.bookingservice.config.JwtUtil;
 import com.skillfactory.luzhin.bookingservice.dto.BookingCreateRequest;
 import com.skillfactory.luzhin.bookingservice.dto.BookingResponse;
 import com.skillfactory.luzhin.bookingservice.entity.BookingStatus;
-import com.skillfactory.luzhin.bookingservice.service.AuthService;
 import com.skillfactory.luzhin.bookingservice.service.BookingService;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -53,6 +51,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @TestPropertySource(properties = {
         "jwt.secret=YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXpBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWjEyMzQ1Njc4OTA="
 })
+@SuppressWarnings("deprecation") // @MockBean deprecated since Spring Boot 3.4, @MockitoBean replacement not yet stable
 class BookingControllerTest {
 
     /**
@@ -60,12 +59,6 @@ class BookingControllerTest {
      */
     @MockBean
     private BookingService bookingService;
-
-    /**
-     * Mock для сервиса аутентификации — используется для проверки JWT.
-     */
-    @MockBean
-    private AuthService authService;
 
     @Value("${jwt.secret}")
     private String jwtSecret;
@@ -81,32 +74,32 @@ class BookingControllerTest {
     private SecretKey signingKey;
 
     /**
+     * Тестовый JWT-токен для авторизации запросов.
+     */
+    private String authToken;
+
+    /**
      * Инициализация MockMvc с Spring Security и секретного ключа JWT.
-     *
-     * @throws Exception ошибка при декодировании ключа
      */
     @BeforeEach
-    void setUp() throws Exception {
+    void setUp() {
         this.signingKey = Keys.hmacShaKeyFor(Base64.getDecoder().decode(jwtSecret));
         this.mockMvc = MockMvcBuilders.webAppContextSetup(wac)
                 .apply(springSecurity())
                 .build();
+        this.authToken = generateToken();
     }
 
     /**
-     * Генерирует JWT-токен для указанного пользователя и роли.
+     * Генерирует тестовый JWT-токен для пользователя testuser с ролью USER.
      *
-     * @param userId идентификатор пользователя
-     * @param username имя пользователя
-     * @param role роль пользователя (USER или ADMIN)
      * @return JWT-токен в строковом формате
      */
-    private String generateToken(Long userId, String username, String role) {
-        String roleClaim = "ROLE_" + role.toUpperCase();
+    private String generateToken() {
         return Jwts.builder()
-                .subject(username)
-                .claim("userId", userId)
-                .claim("role", roleClaim)
+                .subject("testuser")
+                .claim("userId", 1L)
+                .claim("role", "ROLE_USER")
                 .expiration(java.util.Date.from(
                         java.time.Instant.now().plusSeconds(3600)))
                 .signWith(signingKey)
@@ -135,8 +128,6 @@ class BookingControllerTest {
      * Проверяет успешное создание бронирования с явным указанием номера.
      * Запрос: POST /bookings с autoSelect=false и roomId=5.
      * Ожидаемый результат: HTTP 201 Created с DTO бронирования.
-     *
-     * @throws Exception ошибка при выполнении запроса
      */
     @Test
     void shouldCreateBookingWithExplicitRoomId() throws Exception {
@@ -149,7 +140,7 @@ class BookingControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"roomId\":5,\"startDate\":\"2026-12-01T14:00:00\","
                                 + "\"endDate\":\"2026-12-05T11:00:00\",\"autoSelect\":false}")
-                        .header("Authorization", "Bearer " + generateToken(1L, "testuser", "USER")))
+                        .header("Authorization", "Bearer " + authToken))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.roomId").value(5))
@@ -162,8 +153,6 @@ class BookingControllerTest {
      * Проверяет успешное создание бронирования с автоподбором номера.
      * Запрос: POST /bookings с autoSelect=true.
      * Ожидаемый результат: HTTP 201 Created с DTO бронирования.
-     *
-     * @throws Exception ошибка при выполнении запроса
      */
     @Test
     void shouldCreateBookingWithAutoSelect() throws Exception {
@@ -176,7 +165,7 @@ class BookingControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"roomId\":10,\"startDate\":\"2026-12-01T14:00:00\","
                                 + "\"endDate\":\"2026-12-05T11:00:00\",\"autoSelect\":true}")
-                        .header("Authorization", "Bearer " + generateToken(1L, "testuser", "USER")))
+                        .header("Authorization", "Bearer " + authToken))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.roomId").value(10))
@@ -189,8 +178,6 @@ class BookingControllerTest {
      * Проверяет успешное получение бронирования по уникальному идентификатору.
      * Запрос: GET /bookings/1.
      * Ожидаемый результат: HTTP 200 OK с DTO бронирования.
-     *
-     * @throws Exception ошибка при выполнении запроса
      */
     @Test
     void shouldGetBookingById() throws Exception {
@@ -199,7 +186,7 @@ class BookingControllerTest {
         when(bookingService.getBookingById(anyLong(), anyLong())).thenReturn(response);
 
         mockMvc.perform(get("/bookings/1")
-                        .header("Authorization", "Bearer " + generateToken(1L, "testuser", "USER")))
+                        .header("Authorization", "Bearer " + authToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.userId").value(1))
@@ -213,8 +200,6 @@ class BookingControllerTest {
      * Проверяет успешное получение истории бронирований текущего пользователя.
      * Запрос: GET /bookings/bookings.
      * Ожидаемый результат: HTTP 200 OK со списком бронирований.
-     *
-     * @throws Exception ошибка при выполнении запроса
      */
     @Test
     void shouldGetBookingHistory() throws Exception {
@@ -226,7 +211,7 @@ class BookingControllerTest {
         when(bookingService.getBookingsByUserId(anyLong())).thenReturn(bookings);
 
         mockMvc.perform(get("/bookings/bookings")
-                        .header("Authorization", "Bearer " + generateToken(1L, "testuser", "USER")))
+                        .header("Authorization", "Bearer " + authToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].id").value(1))
@@ -239,13 +224,11 @@ class BookingControllerTest {
      * Проверяет успешную отмену бронирования.
      * Запрос: DELETE /bookings/1.
      * Ожидаемый результат: HTTP 204 No Content.
-     *
-     * @throws Exception ошибка при выполнении запроса
      */
     @Test
     void shouldCancelBooking() throws Exception {
         mockMvc.perform(delete("/bookings/1")
-                        .header("Authorization", "Bearer " + generateToken(1L, "testuser", "USER")))
+                        .header("Authorization", "Bearer " + authToken))
                 .andExpect(status().isNoContent());
     }
 
@@ -255,8 +238,6 @@ class BookingControllerTest {
      * Проверяет, что запрос несуществующего бронирования возвращает 404.
      * Запрос: GET /bookings/999.
      * Ожидаемый результат: HTTP 404 Not Found с сообщением об ошибке.
-     *
-     * @throws Exception ошибка при выполнении запроса
      */
     @Test
     void shouldReturnNotFoundForMissingBooking() throws Exception {
@@ -265,7 +246,7 @@ class BookingControllerTest {
                         "Бронирование", 999L));
 
         mockMvc.perform(get("/bookings/999")
-                        .header("Authorization", "Bearer " + generateToken(1L, "testuser", "USER")))
+                        .header("Authorization", "Bearer " + authToken))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.error").value("Not Found"));
@@ -277,8 +258,6 @@ class BookingControllerTest {
      * Проверяет, что доступ к бронированиям без JWT-токена возвращает 401.
      * Запрос: GET /bookings/1 без заголовка Authorization.
      * Ожидаемый результат: HTTP 401 Unauthorized.
-     *
-     * @throws Exception ошибка при выполнении запроса
      */
     @Test
     void shouldRejectAccessWithoutToken() throws Exception {
@@ -292,8 +271,6 @@ class BookingControllerTest {
      * Проверяет, что создание бронирования без JWT-токена возвращает 401.
      * Запрос: POST /bookings без заголовка Authorization.
      * Ожидаемый результат: HTTP 401 Unauthorized.
-     *
-     * @throws Exception ошибка при выполнении запроса
      */
     @Test
     void shouldRejectBookingCreationWithoutToken() throws Exception {

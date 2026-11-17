@@ -8,7 +8,6 @@ import java.time.LocalDateTime;
 
 /**
  * DTO (Transfer Object) для запроса на создание нового бронирования.
- *
  * Используется в эндпоинте POST /bookings.
  *
  * Поля:

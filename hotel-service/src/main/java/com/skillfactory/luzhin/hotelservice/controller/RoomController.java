@@ -26,6 +26,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/rooms")
 @RequiredArgsConstructor
+@SuppressWarnings("unused") // методы вызываются Spring MVC через диспетчеризацию HTTP-запросов
 @Tag(name = "Room Controller", description = "API для управления номерами отелей")
 public class RoomController {
 

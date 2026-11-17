@@ -99,6 +99,7 @@ public class Booking {
      * Метод-колбэк JPA, вызываемый перед сохранением новой записи.
      * Устанавливает дату и время создания через Hibernate.
      */
+    @SuppressWarnings("unused") // вызывается Hibernate через JPA lifecycle callbacks
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();

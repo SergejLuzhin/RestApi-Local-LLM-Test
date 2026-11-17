@@ -14,6 +14,11 @@ import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
+import java.io.IOException;
+
 /**
  * Конфигурация безопасности для Hotel Service с JWT-аутентификацией.
  * Использует stateless-режим с проверкой JWT-токенов для каждого запроса.
@@ -34,6 +39,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableWebSecurity
 @EnableMethodSecurity
 @RequiredArgsConstructor
+@SuppressWarnings("unused") // поля注入руются Spring, методы вызываются Spring Security
 public class SecurityConfig {
 
     /**
@@ -47,21 +53,40 @@ public class SecurityConfig {
      * Точка входа для обработки ошибок аутентификации.
      * Возвращает HTTP 401 Unauthorized вместо 500 Internal Server Error
      * при попытке доступа к защищённым ресурсам без валидного JWT-токена.
-     *
-     * @param request     HTTP-запрос
-     * @param response    HTTP-ответ
-     * @param authException исключение аутентификации
      */
     @Bean
     public AuthenticationEntryPoint authenticationEntryPoint() {
-        return (request, response, authException) -> {
-            response.setStatus(HttpStatus.UNAUTHORIZED.value());
-            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-            response.getWriter().write(
-                    "{\"timestamp\":\"" + java.time.Instant.now()
-                    + "\",\"status\":401,\"error\":\"Unauthorized\","
-                    + "\"message\":\"" + authException.getMessage() + "\"}");
-        };
+        return this::unauthorizedResponse;
+    }
+
+    /**
+     * Формирует ответ 401 Unauthorized при попытке доступа к защищённым ресурсам.
+     */
+    private void unauthorizedResponse(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            org.springframework.security.core.AuthenticationException authException) throws IOException {
+        response.setStatus(HttpStatus.UNAUTHORIZED.value());
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.getWriter().write(
+                "{\"timestamp\":\"" + java.time.Instant.now()
+                + "\",\"status\":401,\"error\":\"Unauthorized\","
+                + "\"message\":\"" + authException.getMessage() + "\"}");
+    }
+
+    /**
+     * Формирует ответ 401 Unauthorized при недостатке прав доступа.
+     */
+    private void accessDeniedResponse(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            org.springframework.security.access.AccessDeniedException accessDeniedException) throws IOException {
+        response.setStatus(HttpStatus.UNAUTHORIZED.value());
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.getWriter().write(
+                "{\"timestamp\":\"" + java.time.Instant.now()
+                + "\",\"status\":401,\"error\":\"Unauthorized\","
+                + "\"message\":\"Authentication required\"}");
     }
 
     /**
@@ -126,14 +151,7 @@ public class SecurityConfig {
                 .exceptionHandling(exception ->
                         exception
                                 .authenticationEntryPoint(entryPoint)
-                                .accessDeniedHandler((request, response, accessDeniedException) -> {
-                                    response.setStatus(HttpStatus.UNAUTHORIZED.value());
-                                    response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                                    response.getWriter().write(
-                                            "{\"timestamp\":\"" + java.time.Instant.now()
-                                            + "\",\"status\":401,\"error\":\"Unauthorized\","
-                                            + "\"message\":\"Authentication required\"}");
-                                }))
+                                .accessDeniedHandler(this::accessDeniedResponse))
 
                 // Добавляем JWT-фильтр перед стандартным фильтром аутентификации
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

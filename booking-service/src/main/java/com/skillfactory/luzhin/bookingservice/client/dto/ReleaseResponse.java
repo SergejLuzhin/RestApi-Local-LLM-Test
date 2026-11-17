@@ -10,7 +10,7 @@ import lombok.*;
  *
  * <p>Содержит информацию о результате компенсации (снятия блокировки слота).
  *
- * @see com.skillfactory.luzhin.hotelservice.controller.RoomController#releaseSlot
+ * @see com.skillfactory.luzhin.hotelservice.controller.RoomController
  */
 @Data
 @NoArgsConstructor

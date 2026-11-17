@@ -10,7 +10,7 @@ import lombok.*;
  *
  * <p>Содержит информацию о результате проверки доступности номера на указанные даты.
  *
- * @see com.skillfactory.luzhin.hotelservice.controller.RoomController#confirmAvailability
+ * @see com.skillfactory.luzhin.hotelservice.controller.RoomController
  */
 @Data
 @NoArgsConstructor

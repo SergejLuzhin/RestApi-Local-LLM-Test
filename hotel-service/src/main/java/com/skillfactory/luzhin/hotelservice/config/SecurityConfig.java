@@ -70,8 +70,8 @@ public class SecurityConfig {
      * <p>Правила авторизации:
      * <ul>
      *   <li>Swagger/OpenAPI ресурсы — доступ без аутентификации</li>
-     *   <li>GET /api/hotels, GET /api/rooms, GET /api/rooms/recommend — публичный доступ</li>
-     *   <li>POST /api/rooms/{id}/confirm-availability, POST /api/rooms/{id}/release — внутренний доступ</li>
+     *   <li>GET /hotels, GET /rooms, GET /rooms/recommend — публичный доступ</li>
+     *   <li>POST /rooms/{id}/confirm-availability, POST /rooms/{id}/release — внутренний доступ</li>
      *   <li>Все остальные запросы — требуют аутентификации</li>
      * </ul>
      *

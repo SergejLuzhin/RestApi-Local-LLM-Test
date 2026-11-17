@@ -77,7 +77,6 @@ public class User {
      * Метод-колбэк JPA, вызываемый перед сохранением новой записи.
      * Устанавливает дату и время создания через Hibernate.
      */
-    @SuppressWarnings("unused")
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
@@ -89,7 +88,6 @@ public class User {
      * Lombok @Setter генерирует setter для updatedAt, но JPA @PreUpdate callback
      * имеет приоритет и перезаписывает значение при каждом обновлении сущности.
      */
-    @SuppressWarnings("unused")
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();

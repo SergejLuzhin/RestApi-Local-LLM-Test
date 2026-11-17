@@ -99,21 +99,8 @@ public class Booking {
      * Метод-колбэк JPA, вызываемый перед сохранением новой записи.
      * Устанавливает дату и время создания через Hibernate.
      */
-    @SuppressWarnings("unused")
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
-    }
-
-    /**
-     * Проверяет, пересекаются ли даты данного бронирования с указанным периодом.
-     *
-     * @param start дата начала проверяемого периода
-     * @param end   дата окончания проверяемого периода
-     * @return true, если даты пересекаются; false в противном случае
-     */
-    @SuppressWarnings("unused")
-    public boolean hasDateOverlap(LocalDateTime start, LocalDateTime end) {
-        return this.startDate.isBefore(end) && this.endDate.isAfter(start);
     }
 }

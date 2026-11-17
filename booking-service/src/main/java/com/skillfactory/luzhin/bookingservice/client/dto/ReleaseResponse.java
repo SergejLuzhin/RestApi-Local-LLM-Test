@@ -6,7 +6,7 @@ import lombok.*;
  * DTO (Transfer Object) для ответа от Hotel Service при снятии временной блокировки.
  *
  * <p>Используется Feign-клиентом для десериализации HTTP-ответа
- * от внутреннего эндпоинта <code>POST /api/rooms/{roomId}/release</code>.
+ * от внутреннего эндпоинта <code>POST /rooms/{roomId}/release</code>.
  *
  * <p>Содержит информацию о результате компенсации (снятия блокировки слота).
  *

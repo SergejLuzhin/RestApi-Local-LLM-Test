@@ -55,7 +55,7 @@ import java.util.UUID;
  *
  * <p>Алгоритм автоподбора номера (autoSelect = true):
  * <ol>
- *   <li>Запрос рекомендованных номеров через Hotel Service ({@code GET /api/rooms/recommend})</li>
+ *   <li>Запрос рекомендованных номеров через Hotel Service ({@code GET /rooms/recommend})</li>
  *   <li>Номера возвращаются отсортированными по {@code timesBooked ASC, id ASC}</li>
  *   <li>Выбирается первый номер из списка (наименее загруженный)</li>
  * </ol>

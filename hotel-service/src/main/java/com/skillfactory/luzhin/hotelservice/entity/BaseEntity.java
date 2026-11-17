@@ -33,7 +33,6 @@ public abstract class BaseEntity {
      * Метод-колбэк JPA, вызываемый перед сохранением новой записи.
      * Устанавливает время создания и обновления через Hibernate.
      */
-    @SuppressWarnings("unused")
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
@@ -44,7 +43,6 @@ public abstract class BaseEntity {
      * Метод-колбэк JPA, вызываемый перед обновлением записи.
      * Обновляет поле updatedAt через Hibernate.
      */
-    @SuppressWarnings("unused")
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();

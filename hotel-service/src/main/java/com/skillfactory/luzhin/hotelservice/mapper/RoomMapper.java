@@ -5,7 +5,6 @@ import com.skillfactory.luzhin.hotelservice.dto.RoomResponse;
 import com.skillfactory.luzhin.hotelservice.entity.Room;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.factory.Mappers;
 
 import java.util.List;
 
@@ -14,8 +13,6 @@ import java.util.List;
  */
 @Mapper(componentModel = "spring", unmappedTargetPolicy = org.mapstruct.ReportingPolicy.IGNORE)
 public interface RoomMapper {
-
-    RoomMapper INSTANCE = Mappers.getMapper(RoomMapper.class);
 
     /**
      * Преобразует запрос создания номера в сущность Room.

@@ -133,7 +133,7 @@ class BookingControllerTest {
 
     /**
      * Проверяет успешное создание бронирования с явным указанием номера.
-     * Запрос: POST /booking с autoSelect=false и roomId=5.
+     * Запрос: POST /bookings с autoSelect=false и roomId=5.
      * Ожидаемый результат: HTTP 201 Created с DTO бронирования.
      *
      * @throws Exception ошибка при выполнении запроса
@@ -160,7 +160,7 @@ class BookingControllerTest {
 
     /**
      * Проверяет успешное создание бронирования с автоподбором номера.
-     * Запрос: POST /booking с autoSelect=true.
+     * Запрос: POST /bookings с autoSelect=true.
      * Ожидаемый результат: HTTP 201 Created с DTO бронирования.
      *
      * @throws Exception ошибка при выполнении запроса

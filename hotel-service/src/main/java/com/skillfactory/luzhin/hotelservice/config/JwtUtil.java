@@ -39,13 +39,13 @@ public class JwtUtil {
     /**
      * Конструктор с автоматической загрузкой конфигурации JWT из application.yml.
      *
-     * @param secretBase64Base64-закодированный секретный ключ для подписи токенов
+     * @param secretBase64 Base64-закодированный секретный ключ для подписи токенов
      * @param expirationMs максимальное время жизни токена в миллисекундах
      */
     public JwtUtil(
-            @Value("${jwt.secret}") String secretBase64Base64,
+            @Value("${jwt.secret}") String secretBase64,
             @Value("${jwt.expiration-ms}") long expirationMs) {
-        this.signingKey = Keys.hmacShaKeyFor(Decoders.BASE64.decode(secretBase64Base64));
+        this.signingKey = Keys.hmacShaKeyFor(Decoders.BASE64.decode(secretBase64));
         this.expirationMs = expirationMs;
     }
 

@@ -6,7 +6,7 @@ import lombok.*;
  * DTO (Transfer Object) для ответа от Hotel Service при подтверждении доступности номера.
  *
  * <p>Используется Feign-клиентом для десериализации HTTP-ответа
- * от внутреннего эндпоинта <code>POST /api/rooms/{roomId}/confirm-availability</code>.
+ * от внутреннего эндпоинта <code>POST /rooms/{roomId}/confirm-availability</code>.
  *
  * <p>Содержит информацию о результате проверки доступности номера на указанные даты.
  *

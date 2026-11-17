@@ -1,7 +1,5 @@
 package com.skillfactory.luzhin.bookingservice.exception;
 
-import com.skillfactory.luzhin.bookingservice.exception.HotelServiceException;
-import com.skillfactory.luzhin.bookingservice.exception.ResourceNotFoundException;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

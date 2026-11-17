@@ -2724,3 +2724,120 @@ springdoc:
 
 ---
 
+## Этап 17: Финальная интеграция и полный цикл через Gateway
+
+### Дата
+17 ноября 2026
+
+### Цель
+Запустить все 4 сервиса (Eureka, Hotel, Booking, Gateway) и выполнить полный цикл интеграционного теста через API Gateway.
+
+### Обнаруженные и исправленные проблемы
+
+#### Проблема 1: Gateway не мог разрешить сервисы через `lb://`
+
+**Суть:** Gateway возвращал 503 Service Unavailable при попытке маршрутизации.
+
+**Причина:** Отсутствовала зависимость `spring-cloud-starter-loadbalancer`. Spring Cloud Gateway не мог разрешить `lb://booking-service` через Eureka.
+
+**Исправление:** Добавлена зависимость в `api-gateway/pom.xml`:
+```xml
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-loadbalancer</artifactId>
+</dependency>
+```
+
+#### Проблема 2: Gateway не маршрутизировал `/api/rooms/**`
+
+**Суть:** Запрос `POST /api/rooms` возвращал 404 через Gateway, но работал напрямую на Hotel Service (8081).
+
+**Причина:** Маршрут Hotel Service в Gateway был настроен только на `Path=/api/hotels/**`. Эндпоинты `/api/rooms/**` не попадали ни под один маршрут.
+
+**Исправление:** Добавлен отдельный маршрут для rooms:
+```yaml
+- id: hotel-rooms-service
+  uri: lb://hotel-service
+  predicates:
+    - Path=/api/rooms/**
+  filters:
+    - RewritePath=/api/(?<segment>.*), /${segment}
+```
+
+> Примечание: Несколько `Path` предикатов для одного маршрута работают через `AND` (логическое И), а не `OR`, поэтому потребовался отдельный entry.
+
+#### Проблема 3: Feign-клиент использовал `/api/` префикс
+
+**Суть:** При создании бронирования возникала ошибка Bad Gateway: `No static resource api/rooms/1/release`.
+
+**Причина:** `HotelServiceClient` обращался к `/api/rooms/{roomId}/release` напрямую к Hotel Service, но контроллеры Hotel Service маппятся без `/api/` префикса (они на `/rooms/{roomId}/release`).
+
+**Исправление:** Убран `/api/` из всех путей Feign-клиента:
+- `/api/rooms/recommend` → `/rooms/recommend`
+- `/api/rooms/{roomId}/confirm-availability` → `/rooms/{roomId}/confirm-availability`
+- `/api/rooms/{roomId}/release` → `/rooms/{roomId}/release`
+
+#### Проблема 4: Нет admin-пользователя для тестов
+
+**Суть:** Регистрация через `/user/register` создаёт только USER-роль, но создание отелей требует ADMIN.
+
+**Решение:** Создан `data.sql` с admin-пользователем, добавлен `defer-datasource-initialization: true` для правильной последовательности инициализации.
+
+**Исправление H2-синтаксиса:** `ON CONFLICT` не поддерживается в H2 — заменён на `SELECT ... WHERE NOT EXISTS`.
+
+### Полный цикл тестирования (Gateway)
+
+| Шаг | Действие | Endpoint | Результат |
+|-----|----------|----------|-----------|
+| 1 | Auth admin | `POST /api/user/auth` | ✅ Токен получен |
+| 2 | Создать отель | `POST /api/hotels` | ✅ ID: 2 |
+| 3 | Создать номер | `POST /api/rooms` | ✅ ID: 2 |
+| 4 | Регистрация пользователя | `POST /api/user/register` | ✅ ID: 2, роль USER |
+| 5 | Рекомендованные номера | `GET /api/rooms/recommend` | ✅ 1 номер |
+| 6 | Создание бронирования | `POST /api/bookings` | ✅ Статус CONFIRMED |
+| 7 | История бронирований | `GET /api/bookings/bookings` | ✅ 1 бронь |
+| 8 | Получить бронь | `GET /api/bookings/1` | ✅ Статус CONFIRMED |
+| 9 | Отмена бронирования | `DELETE /api/bookings/1` | ✅ Статус CANCELLED |
+| 10 | Проверка отмены | `GET /api/bookings/bookings` | ✅ Статус CANCELLED |
+
+### Проверки
+
+| Проверка | Результат |
+|----------|-----------|
+| `mvn clean compile` — весь проект | ✅ BUILD SUCCESS |
+| `mvn test` — Hotel Service (42 теста) | ✅ Все прошли |
+| `mvn test` — Booking Service (25 тестов) | ✅ Все прошли |
+| **Всего тестов** | **67 / 67** ✅ |
+| Полная интеграция (9 шагов через Gateway) | ✅ Все прошли |
+
+### Файлы изменённые на этом этапе
+
+| Файл | Действие |
+|------|----------|
+| `api-gateway/pom.xml` | **Изменён** — добавлен loadbalancer |
+| `api-gateway/.../application.yml` | **Изменён** — добавлен маршрут `/api/rooms/**` |
+| `booking-service/.../client/HotelServiceClient.java` | **Изменён** — убран `/api/` префикс из 3 путей |
+| `booking-service/.../application.yml` | **Изменён** — добавлен `defer-datasource-initialization` |
+| `booking-service/.../resources/data.sql` | **Создан** — admin-пользователь |
+
+---
+
+## 🎉 Проект завершён!
+
+**Итого:** 17 этапов, 4 микросервиса, 67 тестов, полный интеграционный цикл проверен.
+
+**Архитектура:**
+- **Eureka Server** (8761) — реестр сервисов
+- **API Gateway** (8080) — единая точка входа, маршрутизация, RewritePath
+- **Hotel Management Service** (8081) — управление отелями и номерами
+- **Booking Service** (8082) — аутентификация, бронирование, двухфазная транзакция
+
+**Технологии:**
+- Spring Boot 3.5.3, Spring Cloud 2025.0.0
+- Java 17 bytecode on OpenJDK 25
+- JWT (HS256, 1h TTL), BCrypt
+- Feign Client + Resilience4j (retry, circuit breaker)
+- H2 in-memory database
+- Eureka Server + Spring Cloud Gateway
+- OpenAPI/Swagger documentation
+

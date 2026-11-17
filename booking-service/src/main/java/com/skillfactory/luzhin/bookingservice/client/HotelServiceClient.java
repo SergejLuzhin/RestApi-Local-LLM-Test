@@ -55,7 +55,7 @@ public interface HotelServiceClient {
      * @throws com.skillfactory.luzhin.bookingservice.exception.HotelServiceException
      *         если возникла ошибка удалённого сервиса
      */
-    @GetMapping("/api/rooms/recommend")
+    @GetMapping("/rooms/recommend")
     List<RoomRecommendResponse> getRecommendedRooms();
 
     /**
@@ -73,7 +73,7 @@ public interface HotelServiceClient {
      * @throws com.skillfactory.luzhin.bookingservice.exception.HotelServiceException
      *         если номер недоступен или возникла ошибка удалённого сервиса
      */
-    @PostMapping("/api/rooms/{roomId}/confirm-availability")
+    @PostMapping("/rooms/{roomId}/confirm-availability")
     AvailabilityResponse confirmAvailability(
             @PathVariable("roomId") Long roomId,
             @RequestParam("start") LocalDateTime start,
@@ -96,7 +96,7 @@ public interface HotelServiceClient {
      * @throws com.skillfactory.luzhin.bookingservice.exception.HotelServiceException
      *         если возникла ошибка при снятии блокировки
      */
-    @PostMapping("/api/rooms/{roomId}/release")
+    @PostMapping("/rooms/{roomId}/release")
     ReleaseResponse releaseSlot(
             @PathVariable("roomId") Long roomId,
             @RequestParam("start") LocalDateTime start,

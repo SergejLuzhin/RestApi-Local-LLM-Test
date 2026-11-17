@@ -38,10 +38,17 @@ spring:
         # /api/hotels/** → Hotel Service
         # RewritePath преобразует: /api/(?<segment>.+) → /${segment}
         # Пример: /api/hotels → /hotels, /api/rooms → /rooms
-        - id: hotel-service
+        - id: hotel-hotels-service
           uri: lb://hotel-service
           predicates:
             - Path=/api/hotels/**
+          filters:
+            - RewritePath=/api/(?<segment>.*), /${segment}
+
+        - id: hotel-rooms-service
+          uri: lb://hotel-service
+          predicates:
+            - Path=/api/rooms/**
           filters:
             - RewritePath=/api/(?<segment>.*), /${segment}
 
